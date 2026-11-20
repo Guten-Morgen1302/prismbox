@@ -23,7 +23,9 @@ Prismbox is a local development tool. Its security goals, which the code will be
 4. **Page data is untrusted.** Data that originates in the page being edited (node names, `userData`, console text) is treated as untrusted input and is never interpreted as instructions.
 5. **Minimal diffs, no silent corruption.** A write is a minimal text edit. If a file cannot be understood, it is left untouched. The edited output is re-parsed before it replaces the original.
 
-Not yet implemented as of this commit: the daemon, the page overlay, the MCP server and the write API. Only the parser and the in-memory writer in `@prismbox/core` exist. The model above is the contract those pieces must meet.
+Implemented: the daemon, the Vite plugin, the page overlay and the write API (see "Local mode" in `docs/architecture.md`), with tests for each guarantee in `packages/bridge/test` and an end-to-end run in `e2e/`. Not yet implemented: the MCP server.
+
+Known limits: any process on your machine that can open a loopback socket and forge an `Origin` header (a native program, not a web page) can talk to the page channel, but its edits are still gated by the armed state, the rate limit, bounds and re-validation against the file; only a holder of the Studio token can arm or edit directly. No OS offers an atomic compare-and-rename, so a save that lands in the microseconds between the final hash check and the rename can win (the watcher reports it, and undo then refuses).
 
 ## Out of scope
 

@@ -2,7 +2,7 @@
 
 **An agent-native visual editor for React Three Fiber.** Your AI agent writes the `.tsx`. You nudge the scene visually. The change lands as a minimal diff in the same file, and the agent can see what you are pointing at.
 
-> **Status: active v1 development (milestone M1). Early.** The repository contains a tested parser and writer for R3F source files, six hero templates, and a local Playground (Studio with a sandboxed preview). There is no dev-server plugin, no MCP server and no hosted Playground yet. Nothing here should be depended on.
+> **Status: active v1 development (milestone M2). Early.** You can run `prismbox` in a Vite + React 19 + R3F 9 project, drag objects on your real page, and watch each drag land as one line in your `.tsx`. There is no MCP server and no hosted Playground yet, and the API will change.
 
 ## The idea
 
@@ -26,9 +26,19 @@ Round-tripping is only trustworthy on a declared subset of R3F, so Prismbox is s
 | `prismbox` CLI: `--version`, `--help` | working |
 | Six hero templates (`packages/templates`), built from shared GLSL blocks (`packages/shaders`) | working |
 | Studio Playground: scene tree, inspector, gizmo, live diff strip, Copy `.tsx` (runs locally, not deployed) | working |
-| Real-page dev plugin (Vite), daemon, MCP server | planned |
+| `prismbox` Local mode for Vite projects: daemon, real-page overlay, armed Studio, live disk write-back with undo and compare-and-set | working (`pnpm demo`) |
+| MCP server, Next.js | planned |
 
 See [docs/architecture.md](docs/architecture.md) for the design and [docs/subset.md](docs/subset.md) for exactly what is editable.
+
+## Try it on a real page
+
+```bash
+pnpm install && pnpm build
+pnpm demo     # prismbox on examples/vite-hero
+```
+
+Open the two URLs it prints: your page and Studio. Click **Arm**, then drag the 3D knot on the real page. See [examples/vite-hero](examples/vite-hero).
 
 ## Try the Playground locally
 

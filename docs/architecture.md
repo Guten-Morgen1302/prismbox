@@ -36,6 +36,25 @@ Prismbox is in early development. This page describes the intended design and ma
 
 **Playground.** The same Studio on an in-memory file system, for editing templates in the browser with zero install. It edits templates, not your repo.
 
+## Local mode (M2)
+
+`prismbox` (alias `prismbox dev`) in a Vite + React 19 + R3F 9 project:
+
+1. detects the project read-only (versions, no changes to your files),
+2. starts the **daemon** on `127.0.0.1` (default 4173) with a random per-run Studio token,
+3. loads **your** installed Vite and calls `createServer` with the Prismbox plugin as an *inline* plugin, so your `vite.config` still applies and is never edited,
+4. serves Studio from the daemon.
+
+The plugin is `apply: 'serve'` and `enforce: 'pre'`, adds `resolve.dedupe` for react, react-dom, three and R3F, and re-checks `command === 'serve'` in every hook. It runs `instrument()` on your `.tsx` and serves the overlay as the virtual module `virtual:prism-overlay`. Since it is only ever passed in by `prismbox`, your own `vite build` never loads it, and a test builds the example with the plugin loaded anyway and asserts zero Prismbox bytes.
+
+**Daemon.** HTTP + WebSocket on loopback only. Every request checks the `Host` header (DNS rebinding); the Studio socket requires the Studio origin and the session token (moved from the URL fragment into sessionStorage and stripped from the URL); the page socket requires the dev server's origin and a one-shot token fetched per page load. All messages are validated with zod. Files are confined to the project root: no `..`, no absolute paths, no dotfiles or `node_modules`, only `.tsx .ts .jsx .js`, realpath re-checked so a symlink cannot escape.
+
+**d8: armed Studio.** A drag on the page produces one *proposal*. The daemon accepts it only while Studio is armed (disconnecting Studio disarms), applies a token-bucket rate limit, bounds the numbers, then **re-parses the current file itself**, finds the node from the tag, and compare-and-sets the old value the page claims against the value in the file. A disarmed, forged, stale or malformed proposal is rejected with a code and the file is untouched. Arming also tells the overlay to pause the 3D scene's pointer handlers (ordinary page controls keep working).
+
+**Write path.** Every write is: fresh read from disk, `baseHash` check, `@prismbox/core` ops, temp file next to the target, **re-hash immediately before the rename** (a change that lands in between is a CONFLICT and nothing is overwritten), rename with retry, file mode preserved. The daemon keeps an undo/redo stack of exact bytes; undo is refused (not forced) if the file changed outside Prismbox since the edit. A recursive file watcher tells Studio about external edits, and ignores the daemon's own writes by content hash. One honest limit: no operating system offers an atomic compare-and-rename, so a save landing in the microseconds between the re-hash and the rename can still win; the watcher reports it and the next undo refuses.
+
+**Studio.** Same app as the Playground. When it is served by the daemon (it answers `/__prism/session`) it runs in Local mode: the file list, scene tree and inspector are driven by the real file on disk, edits go to the daemon, and the header has the **Arm** toggle. Diff rows are tagged `you`, `page` or `external`.
+
 ## Animation pause (d9)
 
 While a gizmo handle is hovered **or** dragged, the overlay pauses animation by freezing the R3F clock: `clock.getDelta()` returns 0 and keeps `oldTime` fresh, so `useFrame` callbacks keep running with `delta = 0` and a frozen `elapsedTime`, and animation resumes exactly where it stopped. R3F's own `setFrameloop` is not used because it resets `clock.elapsedTime` to 0, which makes absolute-time animation jump. Code that reads time itself (`performance.now()`, GSAP, CSS) is not paused. This relies on R3F's loop calling `clock.getDelta()`; `apps/studio/test/clock.test.ts` reads the installed R3F source and fails if that stops being true, and the overlay warns at runtime if a frozen frame reports a non-zero delta.
@@ -52,7 +71,7 @@ Scene code runs in an iframe with `sandbox="allow-scripts"` and no `allow-same-o
 - **Concurrency**: ops carry the value the caller last saw (`expected`); a mismatch is `CONFLICT`.
 - **Invariants** (CI-enforced): no-op is byte-identical; one primitive op changes one span; out-of-subset input produces diagnostics and zero writes; the edited output is re-parsed before it is accepted.
 
-## Trust model (design, not yet implemented)
+## Trust model (implemented in M2)
 
 - Everything the page sends is untrusted observation: strings are length-capped, labeled untrusted in MCP results, and never placed in instruction position.
 - The write token lives only in Studio-origin session storage. The page channel carries an observation token that rotates per page load and has no write authority.
@@ -66,19 +85,20 @@ See [SECURITY.md](../SECURITY.md).
 | Path | Purpose | State |
 |---|---|---|
 | `packages/core` | `@prismbox/core`: parser, subset classifier, writer, `instrument()`, `outline()` | implemented (reader, `setProp`, `setUniform`, per-key uniforms) |
-| `packages/bridge` | `prismbox` CLI; later the daemon, Vite plugin, harness and MCP server | CLI skeleton |
+| `packages/bridge` | `prismbox` CLI, daemon, Vite plugin and page overlay; later the MCP server | implemented (M2) |
 | `apps/studio` | Studio control panel and the browser Playground (memory FS, sandboxed preview) | implemented for the Playground; not deployed |
 | `packages/templates`, `packages/shaders` | six hero templates and the GLSL blocks they are built from | implemented |
 | `packages/behaviors` | copy-in behavior wrappers | planned |
 | `fixtures/subset` | conformance fixtures | Step 0 files |
-| `examples/` | `vite-landing`, `next-landing` end-to-end targets | planned |
+| `examples/vite-hero` | a plain landing page with a 3D hero; the end-to-end target and demo | implemented |
+| `e2e/` | real-browser end-to-end test (`pnpm e2e`) | implemented |
 
 ## Roadmap
 
 - **M0:** repository standards, CI, `@prismbox/core` reader and writer, CLI skeleton.
-- **M1 (in progress):** `instrument()`, per-key uniforms, six hero templates, Studio on the memory file system (Playground, not deployed). Still to do: `unsetProp`, behaviors package, templates 7 to 10.
-- **M2:** the Vite real-page plugin, daemon, overlay with gizmo, `setCamera`, Studio control panel. Gate: scripted demo on a real Vite page.
+- **M1:** `instrument()`, per-key uniforms, six hero templates, Studio on the memory file system (Playground, not deployed). Still to do: `unsetProp`, behaviors package, templates 7 to 10.
+- **M2 (in progress):** the Vite real-page plugin, daemon, overlay with gizmo, Local-mode Studio, live disk write-back with undo. Gate: end-to-end on `examples/vite-hero`. Still to do: `setCamera`.
 - **M3:** MCP server and agent style guide, point-at selection, Next harness fallback.
 - **M4:** polish, demo, public launch.
 
-Before M2, a spike (Step 0b) must show that a dev-time plugin can inject the overlay into a real Vite page and support pick-to-source and gizmo drag.
+The Step 0b spike showed that a dev-time plugin can inject the overlay into a real Vite page and support pick-to-source and gizmo drag; M2 builds that for real.
