@@ -1,6 +1,6 @@
 {
   "name": "prismbox",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Agent-native visual editor for React Three Fiber. Early development: only the CLI skeleton exists so far.",
   "license": "MIT",
   "author": "Guten-Morgen1302",
