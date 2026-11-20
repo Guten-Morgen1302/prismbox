@@ -1,7 +1,7 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  test: {
-    include: ['test/**/*.test.ts'],
-  },
+  resolve: { alias: { '@prismbox/core': fileURLToPath(new URL('../core/src/index.ts', import.meta.url)) } },
+  test: { include: ['test/**/*.test.ts'], testTimeout: 20000 },
 });

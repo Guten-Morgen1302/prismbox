@@ -1,9 +1,24 @@
 import { defineConfig } from 'tsup';
 
-export default defineConfig({
-  entry: ['src/cli.ts'],
-  format: ['esm'],
-  clean: true,
-  target: 'node20',
-  sourcemap: true,
-});
+export default defineConfig([
+  {
+    entry: { cli: 'src/cli.ts', plugin: 'src/plugin.ts' },
+    format: ['esm'],
+    platform: 'node',
+    target: 'node20',
+    clean: true,
+    sourcemap: true,
+    // the user's Vite is loaded at runtime from their project; never bundle it
+    external: ['vite'],
+  },
+  {
+    // runs in the user's page: react, three and R3F must resolve to the USER's copies
+    entry: { overlay: 'src/overlay/overlay.ts' },
+    format: ['esm'],
+    platform: 'browser',
+    target: 'es2022',
+    clean: false,
+    sourcemap: false,
+    external: ['react', '@react-three/fiber', 'three', /^three\//],
+  },
+]);

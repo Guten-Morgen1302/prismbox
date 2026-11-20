@@ -22,7 +22,9 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "eslint .",
     "test": "pnpm -r --if-present test",
-    "build": "pnpm -r --if-present build"
+    "build": "pnpm -r --if-present build",
+    "e2e": "pnpm --filter @prismbox/e2e e2e",
+    "demo": "node packages/bridge/dist/cli.js --root examples/vite-hero"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

@@ -12,6 +12,8 @@ coverage/
 *.pem
 *.key
 
+.prismbox-tmp-*
+
 # local tooling, planning and scratch (never part of the repo)
 .gstack/
 .claude/settings.local.json
