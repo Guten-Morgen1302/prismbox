@@ -19,7 +19,8 @@ pnpm install
 | `pnpm typecheck` | TypeScript across all packages |
 | `pnpm lint` | ESLint |
 | `pnpm test` | Vitest: unit tests and the AST conformance suite |
-| `pnpm build` | Build every package |
+| `pnpm build` | Build every package (and check the generated templates are up to date) |
+| `pnpm --filter @prismbox/studio dev` | Run the Playground at http://127.0.0.1:4173 |
 
 CI runs the same four steps on Linux and Windows. A PR needs all of them green.
 
@@ -39,7 +40,7 @@ Open an issue with the smallest `.tsx` that reproduces it. Please only share cod
 
 ## Hero templates
 
-Template submissions (a single plain `.tsx` inside the supported subset) will open once the template kit lands. The PR checklist will live in `docs/writing-a-template.md`. Until then, please open an issue first.
+A template is a single plain `.tsx` inside the supported subset. The rules and the authoring flow are in [docs/writing-a-template.md](docs/writing-a-template.md). The first six ship in `packages/templates`; templates 7 to 10 are open for community PRs.
 
 ## Pull requests
 

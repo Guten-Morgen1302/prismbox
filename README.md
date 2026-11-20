@@ -2,7 +2,7 @@
 
 **An agent-native visual editor for React Three Fiber.** Your AI agent writes the `.tsx`. You nudge the scene visually. The change lands as a minimal diff in the same file, and the agent can see what you are pointing at.
 
-> **Status: active v1 development (milestone M0). Not usable yet.** Today the repository contains a tested parser and writer for R3F source files and a CLI skeleton. There is no editor, no dev-server plugin, no MCP server and no published package yet. Nothing here should be depended on.
+> **Status: active v1 development (milestone M1). Early.** The repository contains a tested parser and writer for R3F source files, six hero templates, and a local Playground (Studio with a sandboxed preview). There is no dev-server plugin, no MCP server and no hosted Playground yet. Nothing here should be depended on.
 
 ## The idea
 
@@ -24,10 +24,20 @@ Round-tripping is only trustworthy on a declared subset of R3F, so Prismbox is s
 |---|---|
 | `@prismbox/core`: parse R3F files, classify nodes and props, write one prop as a single-span edit | working, tested |
 | `prismbox` CLI: `--version`, `--help` | working |
-| Real-page dev plugin (Vite), Studio control panel, daemon, MCP server | planned |
-| Browser playground, hero templates | planned |
+| Six hero templates (`packages/templates`), built from shared GLSL blocks (`packages/shaders`) | working |
+| Studio Playground: scene tree, inspector, gizmo, live diff strip, Copy `.tsx` (runs locally, not deployed) | working |
+| Real-page dev plugin (Vite), daemon, MCP server | planned |
 
 See [docs/architecture.md](docs/architecture.md) for the design and [docs/subset.md](docs/subset.md) for exactly what is editable.
+
+## Try the Playground locally
+
+```bash
+pnpm install
+pnpm --filter @prismbox/studio dev
+```
+
+Open <http://127.0.0.1:4173/>. Pick a template, click an object, drag a gizmo handle or use the inspector, and watch the exact one-line patch land in the diff strip. **Copy .tsx** gives you plain React Three Fiber with no Prismbox in it. Design notes: [DESIGN.md](DESIGN.md).
 
 ## Try the core
 

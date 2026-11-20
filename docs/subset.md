@@ -53,7 +53,9 @@ Rules: the binding must be a `const` with an `Identifier` name, found in an encl
 
 Edits to such a prop land on the **binding's literal**, not on the JSX attribute, and each resolved prop reports `sharedBy` (how many props read the same binding; editing it changes all of them). `vertexShader` / `fragmentShader` are never rewritten (GLSL source is not editable in v1); `uniforms` values are, through `setUniform`.
 
-A `uniforms` object with even one non-literal value (`{ uTex: { value: texture } }`) is an expression as a whole and read-only.
+### Per-key uniforms
+
+A `uniforms` object with some non-literal values, such as `{ uTex: { value: texture }, uMix: { value: 0.5 } }`, is **not** locked as a whole. The node is read-only for coverage, but each key is classified on its own (`PropInfo.keys`, `node.shader.keys`): literal keys stay editable through `setUniform`, and only the non-literal keys are refused (`OUT_OF_SUBSET`). This works for an inline object and for a same-file `const` or empty-deps `useMemo` binding. An entry that is not a `{ value: ... }` object, a spread, or a computed key is a non-literal key.
 
 ### `@prism` annotations
 
@@ -64,7 +66,7 @@ GLSL can describe its own uniforms, so any shader gets sliders without a Prismbo
 // @prism uniform uColorA color =#7c5cff
 ```
 
-Types: `float`, `int`, `bool`, `vec2`, `vec3`, `vec4`, `color`. Annotations are read from GLSL that is a literal or resolves to one.
+Types: `float`, `int`, `bool`, `vec2`, `vec3`, `vec4`, `color`. Annotations are read from GLSL that is a literal or resolves to one. They are ordinary GLSL comments: a shader author may keep or delete them, nothing imports anything for them, and they ship in the shader string like any other comment.
 
 ## Known drei components
 
@@ -77,6 +79,12 @@ A scene file may import from `react`, `three` (and `three/...`), `@react-three/f
 ## Node ids
 
 A node's id is its `name` prop when that is a **unique string literal**, otherwise its path id: the enclosing component, then tags with sibling indexes, for example `Hero:div>Canvas[0]>group[2]>mesh[1]`. A duplicated name makes every node with it `ambiguous`; writes to an ambiguous node return `AMBIGUOUS_NODE`. Prismbox never inserts a `name` as a side effect of another edit; naming is its own explicit `setProp`.
+
+## Instrumentation
+
+`instrument(source, path)` is the one dev-time transform shared by the real-page plugin, the harness fallback and the Playground. It adds `userData-prism="<path>:<line>:<col>"` (the element's position in the original source) after the last attribute of every R3F host element that has a `.userData` (Object3D, Material, BufferGeometry), and injects `<__PrismOverlay />` into the first `<Canvas>`. It never tags `<color>`, `<fog>`, `<primitive>`, attributes or other attach-only types, is idempotent, source-mapped and deterministic, and its output only ever runs in a dev server or sandbox; your file on disk is never changed by it.
+
+`outline(scene)` returns the source-ordered node tree with an edit state per node: `editable`, `partial` (some literal props) or `read-only`.
 
 ## Operations
 

@@ -36,6 +36,14 @@ Prismbox is in early development. This page describes the intended design and ma
 
 **Playground.** The same Studio on an in-memory file system, for editing templates in the browser with zero install. It edits templates, not your repo.
 
+## Animation pause (d9)
+
+While a gizmo handle is hovered **or** dragged, the overlay pauses animation by freezing the R3F clock: `clock.getDelta()` returns 0 and keeps `oldTime` fresh, so `useFrame` callbacks keep running with `delta = 0` and a frozen `elapsedTime`, and animation resumes exactly where it stopped. R3F's own `setFrameloop` is not used because it resets `clock.elapsedTime` to 0, which makes absolute-time animation jump. Code that reads time itself (`performance.now()`, GSAP, CSS) is not paused. This relies on R3F's loop calling `clock.getDelta()`; `apps/studio/test/clock.test.ts` reads the installed R3F source and fails if that stops being true, and the overlay warns at runtime if a frozen frame reports a non-zero delta.
+
+## Playground sandbox (d2)
+
+Scene code runs in an iframe with `sandbox="allow-scripts"` and no `allow-same-origin`: an opaque origin with no access to Studio's storage or DOM. The only channel is a typed, validated `postMessage` protocol (`apps/studio/src/protocol.ts`); Studio ignores anything that does not parse and any message not from its own iframe. Inside, `instrument()` tags the file, Sucrase strips TypeScript and JSX, and the result is evaluated against a fixed module map (react, three, R3F, drei, the overlay, relative files); any other import is an `UNSUPPORTED_IMPORT` error, never a network fetch. The production build adds a CSP to the sandbox page with `connect-src 'none'`. Edits live in an in-memory file system and are saved to `localStorage`.
+
 ## Write-back (`@prismbox/core`, implemented)
 
 - **Parse** with `@babel/parser`. Never reprint.
@@ -57,17 +65,18 @@ See [SECURITY.md](../SECURITY.md).
 
 | Path | Purpose | State |
 |---|---|---|
-| `packages/core` | `@prismbox/core`: parser, subset classifier, writer | implemented (reader, `setProp`, `setUniform`) |
+| `packages/core` | `@prismbox/core`: parser, subset classifier, writer, `instrument()`, `outline()` | implemented (reader, `setProp`, `setUniform`, per-key uniforms) |
 | `packages/bridge` | `prismbox` CLI; later the daemon, Vite plugin, harness and MCP server | CLI skeleton |
-| `apps/studio` | Studio control panel and Playground | planned |
-| `packages/templates`, `behaviors`, `shaders` | hero templates, copy-in behavior wrappers, GLSL presets | planned |
+| `apps/studio` | Studio control panel and the browser Playground (memory FS, sandboxed preview) | implemented for the Playground; not deployed |
+| `packages/templates`, `packages/shaders` | six hero templates and the GLSL blocks they are built from | implemented |
+| `packages/behaviors` | copy-in behavior wrappers | planned |
 | `fixtures/subset` | conformance fixtures | Step 0 files |
 | `examples/` | `vite-landing`, `next-landing` end-to-end targets | planned |
 
 ## Roadmap
 
-- **M0 (this milestone):** repository standards, CI, `@prismbox/core` reader and writer, CLI skeleton.
-- **M1:** `unsetProp`, the `instrument()` source-mapping transform, templates and behaviors, Studio on the memory file system, silent playground staging.
+- **M0:** repository standards, CI, `@prismbox/core` reader and writer, CLI skeleton.
+- **M1 (in progress):** `instrument()`, per-key uniforms, six hero templates, Studio on the memory file system (Playground, not deployed). Still to do: `unsetProp`, behaviors package, templates 7 to 10.
 - **M2:** the Vite real-page plugin, daemon, overlay with gizmo, `setCamera`, Studio control panel. Gate: scripted demo on a real Vite page.
 - **M3:** MCP server and agent style guide, point-at selection, Next harness fallback.
 - **M4:** polish, demo, public launch.
