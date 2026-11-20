@@ -1,15 +1,27 @@
 import { diffParts } from '../session';
-import type { DiffEntry } from '../session';
 
-function Row({ e }: { e: DiffEntry }) {
+/** The shape the strip renders. Both the Playground's session log and the daemon's wire entries fit it. */
+export interface StripEntry {
+  id: number;
+  kind: string;
+  file?: string;
+  line: number;
+  before: string;
+  after: string;
+  summary: string;
+  author: string;
+  at: number;
+}
+
+function Row({ e }: { e: StripEntry }) {
   const p = diffParts(e.before, e.after);
   const time = new Date(e.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   return (
     <div className={`diff-row ${e.kind}`}>
       <div className="diff-meta">
-        <code>Hero.tsx:{e.line}</code>
+        <code>{e.file ?? 'Hero.tsx'}:{e.line}</code>
         <span className="diff-summary">{e.summary}</span>
-        <span className="author">{e.author}</span>
+        <span className={`author ${e.author}`}>{e.author}</span>
         <span className="time">{time}</span>
       </div>
       <pre className="hunk del"><span className="sign">-</span>{p.prefix}<mark>{p.removed}</mark>{p.suffix}</pre>
@@ -19,7 +31,9 @@ function Row({ e }: { e: DiffEntry }) {
 }
 
 export interface DiffStripProps {
-  log: DiffEntry[];
+  log: StripEntry[];
+  savedLabel?: string;
+  undoHint?: string;
   canUndo: boolean;
   canRedo: boolean;
   error: string | null;
@@ -27,7 +41,7 @@ export interface DiffStripProps {
   onRedo: () => void;
 }
 
-export function DiffStrip({ log, canUndo, canRedo, error, onUndo, onRedo }: DiffStripProps) {
+export function DiffStrip({ log, canUndo, canRedo, error, savedLabel = 'saved in this browser', undoHint = 'Undo (Ctrl+Z)', onUndo, onRedo }: DiffStripProps) {
   const last = log[0];
   return (
     <section className="panel diff-strip" aria-label="Changes">
@@ -36,9 +50,9 @@ export function DiffStrip({ log, canUndo, canRedo, error, onUndo, onRedo }: Diff
         <span className="count">{log.length === 0 ? 'none yet' : `${log.length} ${log.length === 1 ? 'edit' : 'edits'}`}</span>
         <span className="spacer" />
         <span className="status-slot" data-state={error ? 'error' : last ? 'saved' : 'idle'}>
-          {error ? 'refused' : last ? 'saved in this browser' : 'idle'}
+          {error ? 'refused' : last ? savedLabel : 'idle'}
         </span>
-        <button type="button" className="btn ghost" onClick={onUndo} disabled={!canUndo} title="Undo (Ctrl+Z)">Undo</button>
+        <button type="button" className="btn ghost" onClick={onUndo} disabled={!canUndo} title={undoHint}>Undo</button>
         <button type="button" className="btn ghost" onClick={onRedo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">Redo</button>
       </div>
       {error && <div className="diff-error" role="alert">{error}</div>}

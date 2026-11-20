@@ -6,6 +6,7 @@ import { ColorField, NumberField, Slider, Toggle } from './controls';
 export interface InspectorProps {
   node: SceneNode | null;
   edit: 'editable' | 'partial' | 'read-only' | null;
+  file: string;
   /** Live (uncommitted) preview of a value inside the sandbox. */
   onLive: (tag: string, target: Target, value: PropValue) => void;
   /** Commit one edit to the source. */
@@ -14,8 +15,8 @@ export interface InspectorProps {
 
 const AXES = ['x', 'y', 'z'] as const;
 
-function FieldRow({ node, field, onLive, onCommit }: { node: SceneNode; field: Field; onLive: InspectorProps['onLive']; onCommit: InspectorProps['onCommit'] }) {
-  const tag = `Hero.tsx:${node.line}:${node.col}`;
+function FieldRow({ node, file, field, onLive, onCommit }: { node: SceneNode; file: string; field: Field; onLive: InspectorProps['onLive']; onCommit: InspectorProps['onCommit'] }) {
+  const tag = `${file}:${node.line}:${node.col}`;
   if (field.state === 'locked') {
     return (
       <div className="field locked" title={field.reason}>
@@ -110,7 +111,7 @@ function FieldRow({ node, field, onLive, onCommit }: { node: SceneNode; field: F
 
 const EDIT_LABEL = { editable: 'Editable', partial: 'Partly editable', 'read-only': 'Read-only' } as const;
 
-export function Inspector({ node, edit, onLive, onCommit }: InspectorProps) {
+export function Inspector({ node, edit, file, onLive, onCommit }: InspectorProps) {
   if (!node) {
     return (
       <aside className="panel inspector">
@@ -133,7 +134,7 @@ export function Inspector({ node, edit, onLive, onCommit }: InspectorProps) {
             <code className="node-tag">&lt;{node.tag}&gt;</code>
           </div>
           <div className="node-meta">
-            <code>Hero.tsx:{node.line}</code>
+            <code>{file}:{node.line}</code>
             {edit && <span className={`badge ${edit}`}>{EDIT_LABEL[edit]}</span>}
           </div>
           {node.reasons.length > 0 && edit !== 'editable' && <ul className="reasons">{node.reasons.map((r) => <li key={r}>{r}</li>)}</ul>}
@@ -142,7 +143,7 @@ export function Inspector({ node, edit, onLive, onCommit }: InspectorProps) {
         {sections.map((s) => (
           <section key={s.title} className="section">
             <h3>{s.title}</h3>
-            {s.fields.map((f) => <FieldRow key={f.id} node={node} field={f} onLive={onLive} onCommit={onCommit} />)}
+            {s.fields.map((f) => <FieldRow key={f.id} node={node} file={file} field={f} onLive={onLive} onCommit={onCommit} />)}
           </section>
         ))}
       </div>

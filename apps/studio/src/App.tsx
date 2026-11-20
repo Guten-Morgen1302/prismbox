@@ -238,7 +238,7 @@ export function App() {
         onView={onView}
         onGizmo={onGizmo}
       />
-      <Inspector node={selected} edit={selectedEntry?.edit ?? null} onLive={live} onCommit={edit} />
+      <Inspector node={selected} edit={selectedEntry?.edit ?? null} file={FILE_NAME} onLive={live} onCommit={edit} />
       <DiffStrip
         log={session.log}
         canUndo={session.undoStack.length > 0}

@@ -14,7 +14,7 @@ export interface ViewportProps {
   onGizmo: (g: GizmoMode) => void;
 }
 
-function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: { id: T; label: string; title?: string }[]; onChange: (v: T) => void; label: string }) {
+export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: { id: T; label: string; title?: string }[]; onChange: (v: T) => void; label: string }) {
   return (
     <div className="segmented" role="group" aria-label={label}>
       {options.map((o) => (
