@@ -1,0 +1,30 @@
+{
+  "name": "prismbox",
+  "version": "0.0.0",
+  "description": "Agent-native visual editor for React Three Fiber. Early development: only the CLI skeleton exists so far.",
+  "license": "MIT",
+  "author": "Guten-Morgen1302",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Guten-Morgen1302/prismbox.git",
+    "directory": "packages/bridge"
+  },
+  "homepage": "https://github.com/Guten-Morgen1302/prismbox#readme",
+  "bugs": {
+    "url": "https://github.com/Guten-Morgen1302/prismbox/issues"
+  },
+  "keywords": ["react-three-fiber", "r3f", "three", "visual-editor", "mcp", "claude-code"],
+  "type": "module",
+  "bin": {
+    "prismbox": "./dist/cli.js"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  }
+}

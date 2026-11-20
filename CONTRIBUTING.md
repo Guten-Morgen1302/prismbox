@@ -4,7 +4,7 @@ Thanks for helping. Prismbox is in early development, so the most useful contrib
 
 ## Setup
 
-Requirements: Node.js 20 or newer and [pnpm](https://pnpm.io) 10.
+Requirements: Node.js 22.12 or newer for development (the published packages run on Node.js 20+) and [pnpm](https://pnpm.io) 10.
 
 ```bash
 git clone https://github.com/Guten-Morgen1302/prismbox.git
