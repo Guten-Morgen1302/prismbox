@@ -1,5 +1,5 @@
-# packages/shaders
+# @prismbox/shaders
 
-GLSL presets with `@prism` uniform annotations. Planned for milestone M1.
+Reusable GLSL blocks the hero templates are built from: `noise` (simplex, fbm), `fresnel`, `palette` (cosine palette, grain) and `studio` (a procedural photo-studio environment). Private package: not published.
 
-Planned, not implemented yet. This directory is a placeholder so the repository layout matches the architecture; it has no `package.json` and publishes nothing.
+Blocks are spliced into templates at generation time, so a finished template is plain GLSL with no reference to this package.

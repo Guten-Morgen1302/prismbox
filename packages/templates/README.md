@@ -1,5 +1,5 @@
-# packages/templates
+# @prismbox/templates
 
-Hero templates as plain `.tsx` files with a manifest and preview. Planned for milestone M1.
+Six hero templates as single plain React Three Fiber `.tsx` files with no Prismbox import. Private package: not published. See [docs/writing-a-template.md](../../docs/writing-a-template.md).
 
-Planned, not implemented yet. This directory is a placeholder so the repository layout matches the architecture; it has no `package.json` and publishes nothing.
+`source/` holds the authoring files (GLSL blocks pulled in with `//@include`); `templates/` is the generated output that ships; `manifest.json` lists them.
