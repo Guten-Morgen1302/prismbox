@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"],
+    "paths": { "@prismbox/core": ["../../packages/core/src/index.ts"] }
+  },
+  "include": ["src", "test", "vite.config.ts", "vitest.config.ts"]
+}
