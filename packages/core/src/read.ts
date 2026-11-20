@@ -3,15 +3,26 @@ import type { N } from './ast';
 import { DREI_PACKAGE, isKnownDrei } from './drei';
 import { parsePrismAnnotations } from './glsl';
 import type { PrismAnnotation } from './glsl';
-import { categorize, evalLiteral, isLiteral, OPAQUE_LITERAL } from './literal';
+import { categorize, evalLiteral, isLiteral, OPAQUE_LITERAL, uniformValueOf } from './literal';
 import type { PropValue } from './literal';
-import { resolveBinding } from './resolve';
+import { isPlainObject, resolveBinding } from './resolve';
 import type { ResolvedBinding } from './resolve';
 import { ALLOWED_PACKAGES, HTML_TAGS, OPAQUE_TAGS, SHADER_RESOLVABLE_PROPS, SUBSET_VERSION } from './subset';
 
 export type NodeKind = 'host' | 'drei' | 'canvas';
 export type NodeStatus = 'editable' | 'read-only' | 'opaque' | 'instance';
 export type PropKind = 'literal' | 'resolved' | 'expression' | 'spread' | 'meta';
+
+/** One entry of a `shaderMaterial` `uniforms` object. Literal keys stay editable even when others are not. */
+export interface UniformKey {
+  name: string;
+  kind: 'literal' | 'expression';
+  /** Plain value of a literal `value` (`new THREE.Color("#hex")` gives the hex string). */
+  value?: PropValue;
+  /** Span of the `value` expression; -1 when the entry has no `value: ...` property. */
+  valueStart: number;
+  valueEnd: number;
+}
 
 export interface PropInfo {
   name: string;
@@ -28,6 +39,8 @@ export interface PropInfo {
   valueEnd: number;
   /** For `expression` props: a coarse category such as `identifier` or `call`. */
   category?: string;
+  /** `uniforms` on a shaderMaterial: per-key info, when the object (inline or same-file) is a plain object literal. */
+  keys?: UniformKey[];
   /** For `resolved` props: where the value really lives. */
   resolved?: {
     via: 'const' | 'useMemo';
@@ -60,7 +73,7 @@ export interface SceneNode {
   locked: "opaque" | "map" | "conditional" | "spread" | null;
   props: PropInfo[];
   /** `shaderMaterial` only: `@prism` annotations found in resolvable GLSL, and the literal uniform names. */
-  shader?: { annotations: PrismAnnotation[]; uniforms: string[] };
+  shader?: { annotations: PrismAnnotation[]; uniforms: string[]; keys: UniformKey[] };
 }
 
 export interface Diagnostic {
@@ -114,6 +127,25 @@ export interface Analysis {
 }
 
 const isMetaProp = (name: string): boolean => name === 'key' || name === 'ref' || /^on[A-Z]/.test(name);
+
+function uniformKeys(obj: N): UniformKey[] {
+  const out: UniformKey[] = [];
+  for (const p of obj.properties as N[]) {
+    const name = String(p.key.type === 'Identifier' ? p.key.name : p.key.value);
+    const entry = unwrapTs(p.value);
+    const valueProp = isPlainObject(entry)
+      ? (entry.properties as N[]).find((q) => (q.key.type === 'Identifier' ? q.key.name : q.key.value) === 'value')
+      : undefined;
+    const vNode = valueProp ? unwrapTs(valueProp.value) : undefined;
+    if (vNode && isLiteral(vNode, 'value')) {
+      const value = uniformValueOf(vNode);
+      out.push({ name, kind: 'literal', ...(value === undefined ? {} : { value }), valueStart: vNode.start, valueEnd: vNode.end });
+    } else {
+      out.push({ name, kind: 'expression', valueStart: vNode ? vNode.start : -1, valueEnd: vNode ? vNode.end : -1 });
+    }
+  }
+  return out;
+}
 
 function unwrapTs(e: N): N {
   let cur = e;
@@ -247,23 +279,34 @@ export function analyze(source: string, file = '<memory>'): Analysis {
           if (ev !== OPAQUE_LITERAL) info.value = ev;
         } else {
           const inner = unwrapTs(expr);
+          const isUniforms = tag === 'shaderMaterial' && name === 'uniforms';
           const found = tag === 'shaderMaterial' && SHADER_RESOLVABLE_PROPS.has(name) && inner?.type === 'Identifier'
-            ? resolveBinding(inner, parents, name)
+            ? resolveBinding(inner, parents, name, isUniforms)
             : null;
           if (found) {
             binding = found;
-            info.kind = 'resolved';
-            const ev = evalLiteral(found.target);
-            if (ev !== OPAQUE_LITERAL) info.value = ev;
             info.resolved = { via: found.via, name: found.name, targetStart: found.target.start, targetEnd: found.target.end, sharedBy: 1 };
+            if (isLiteral(found.target, name)) {
+              info.kind = 'resolved';
+              const ev = evalLiteral(found.target);
+              if (ev !== OPAQUE_LITERAL) info.value = ev;
+            } else {
+              info.kind = 'expression';
+              info.category = 'object-partial';
+            }
           } else {
             info.kind = 'expression';
-            info.category = categorize(expr);
+            info.category = isUniforms && isPlainObject(inner) ? 'object-partial' : categorize(expr);
           }
         }
       } else {
         info.kind = 'expression';
         info.category = 'jsx-value';
+      }
+
+      if (tag === 'shaderMaterial' && name === 'uniforms' && v?.type === 'JSXExpressionContainer') {
+        const obj = binding ? binding.target : unwrapTs(v.expression);
+        if (isPlainObject(obj)) info.keys = uniformKeys(obj);
       }
 
       if (isMetaProp(name)) {
@@ -277,7 +320,10 @@ export function analyze(source: string, file = '<memory>'): Analysis {
         }
         if (info.kind === 'expression') {
           allLiteral = false;
-          reasons.push(`\`${name}\` is ${info.category === 'identifier' ? 'an identifier' : `an expression (${info.category})`}`);
+          if (info.category === 'object-partial') {
+            const bad = (info.keys ?? []).filter((k) => k.kind === 'expression').map((k) => k.name);
+            reasons.push(`\`uniforms\` has non-literal keys (${bad.join(', ') || 'unknown'}); the literal keys stay editable`);
+          } else reasons.push(`\`${name}\` is ${info.category === 'identifier' ? 'an identifier' : `an expression (${info.category})`}`);
           diag({ code: 'NON_LITERAL_PROP', severity: 'info', message: `<${tag}> prop "${name}" is not a literal (${info.category}); it is read-only.` }, a.start);
         }
       }
@@ -314,10 +360,8 @@ export function analyze(source: string, file = '<memory>'): Analysis {
           annotations.push(...parsePrismAnnotations(info.value));
         }
       }
-      const u = attrMap.get('uniforms')?.info;
-      const uniforms = u && (u.kind === 'literal' || u.kind === 'resolved') && u.value && typeof u.value === 'object' && !Array.isArray(u.value)
-        ? Object.keys(u.value) : [];
-      node.shader = { annotations, uniforms };
+      const keys = attrMap.get('uniforms')?.info.keys ?? [];
+      node.shader = { annotations, uniforms: keys.map((k) => k.name), keys };
     }
 
     if (kind === 'host') {

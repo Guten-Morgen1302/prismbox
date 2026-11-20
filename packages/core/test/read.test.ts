@@ -146,6 +146,23 @@ describe('same-file shader bindings', () => {
   });
 });
 
+describe('per-key uniforms', () => {
+  it('classifies each uniforms key and keeps the node read-only with a clear reason', () => {
+    const src = wrap('<shaderMaterial name="m" uniforms={{ uTex: { value: tex }, uMix: { value: 0.5 }, uBare: tex }} />', 'const tex = null;');
+    const n = find(src, 'shaderMaterial');
+    const keys = n?.shader?.keys.map((k) => [k.name, k.kind, k.value]);
+    expect(keys).toEqual([['uTex', 'expression', undefined], ['uMix', 'literal', 0.5], ['uBare', 'expression', undefined]]);
+    expect(n?.status).toBe('read-only');
+    expect(n?.reasons.join(' ')).toContain('literal keys stay editable');
+    expect(n?.props.find((p) => p.name === 'uniforms')?.category).toBe('object-partial');
+  });
+
+  it('exposes keys for fully literal and same-file uniforms too', () => {
+    const lit = find(wrap('<shaderMaterial uniforms={u} />', 'const u = { a: { value: [1, 2] }, c: { value: new THREE.Color("#abc") } };'), 'shaderMaterial');
+    expect(lit?.shader?.keys.map((k) => [k.name, k.value])).toEqual([['a', [1, 2]], ['c', '#abc']]);
+  });
+});
+
 describe('@prism annotations', () => {
   it('parses float ranges, defaults and colors', () => {
     const a = parsePrismAnnotations('// @prism uniform uIntensity float 0..1 =0.6\n// @prism uniform uColorA color =#7c5cff\n// @prism uniform uN int -2..8\n// not an annotation\n// @prism uniform broken');

@@ -15,6 +15,11 @@ export type {
   Scene,
   SceneNode,
   SceneSummary,
+  UniformKey,
 } from './read';
 export { applyOps, OpSchema, PropValueSchema, setProp, SetPropOpSchema, setUniform, SetUniformOpSchema } from './write';
 export type { Edit, Op, SetPropOp, SetUniformOp, WriteResult } from './write';
+export { instrument, OVERLAY_SPECIFIER, TAG_PROP, taggable } from './instrument';
+export type { InstrumentOptions, InstrumentResult } from './instrument';
+export { findNodeByTag, outline } from './outline';
+export type { OutlineEntry } from './outline';

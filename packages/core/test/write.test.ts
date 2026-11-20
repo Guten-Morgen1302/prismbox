@@ -232,10 +232,29 @@ describe('setUniform', () => {
     expect(code(() => setUniform(src, { op: 'setUniform', node: 'm', uniform: 'uC', value: 'red' }))).toBe('INVALID_VALUE');
   });
 
-  it('refuses a non-literal uniform value and an unknown uniform', () => {
-    // one non-literal value makes the whole `uniforms` object a non-literal prop (read-only)
-    const mixed = mat('{{ uT: { value: time }, uOk: { value: 1 } }}', 'const time = 0;');
-    expect(code(() => setUniform(mixed, { op: 'setUniform', node: 'm', uniform: 'uOk', value: 2 }))).toBe('OUT_OF_SUBSET');
+  it('edits the literal keys of a mixed uniforms object and refuses only the non-literal key', () => {
+    const src = mat('{{ uTex: { value: tex }, uMix: { value: 0.5 }, uC: { value: new THREE.Color("#fff") } }}', 'import * as THREE from "three";\nconst tex = null;');
+    const r = setUniform(src, { op: 'setUniform', node: 'm', uniform: 'uMix', value: 0.9 });
+    expect(r.source).toBe(src.replace('uMix: { value: 0.5 }', 'uMix: { value: 0.9 }'));
+    expect(setUniform(src, { op: 'setUniform', node: 'm', uniform: 'uC', value: '#000000' }).source).toContain('new THREE.Color("#000000")');
+    expect(code(() => setUniform(src, { op: 'setUniform', node: 'm', uniform: 'uTex', value: 1 }))).toBe('OUT_OF_SUBSET');
+  });
+
+  it('edits the literal keys of a mixed uniforms object that lives in a same-file const or useMemo', () => {
+    const viaConst = mat('{u}', 'const tex = null;\nconst u = { uTex: { value: tex }, uMix: { value: 0.5 } };');
+    expect(setUniform(viaConst, { op: 'setUniform', node: 'm', uniform: 'uMix', value: 1 }).source).toContain('uMix: { value: 1 }');
+    const viaMemo = `import { Canvas } from "@react-three/fiber";
+import { useMemo } from "react";
+export default function H({ tex }: { tex: object }) {
+  const u = useMemo(() => ({ uTex: { value: tex }, uMix: { value: 0.2 } }), [tex]);
+  return <Canvas><shaderMaterial name="m" uniforms={u} /></Canvas>;
+}
+`;
+    // a useMemo with dependencies is not a same-file binding, so it stays fully read-only
+    expect(code(() => setUniform(viaMemo, { op: 'setUniform', node: 'm', uniform: 'uMix', value: 1 }))).toBe('OUT_OF_SUBSET');
+  });
+
+  it('reports an unknown uniform', () => {
     const ok = mat('{{ uOk: { value: 1 } }}');
     expect(code(() => setUniform(ok, { op: 'setUniform', node: 'm', uniform: 'nope', value: 1 }))).toBe('UNIFORM_NOT_FOUND');
   });

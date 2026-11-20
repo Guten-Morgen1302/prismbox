@@ -169,3 +169,20 @@ export function round3(n: number): number {
   const r = Math.round(n * 1000) / 1000;
   return Object.is(r, -0) ? 0 : r;
 }
+
+/**
+ * The plain value of a literal uniform `value`. `new THREE.Color("#hex")` yields the hex string and
+ * `new THREE.VectorN(a, b)` yields the number array.
+ */
+export function uniformValueOf(e: N): PropValue | undefined {
+  let x = e;
+  while (x && (x.type === 'TSAsExpression' || x.type === 'TSSatisfiesExpression' || x.type === 'TSNonNullExpression')) x = x.expression;
+  if (x?.type === 'NewExpression') {
+    const args = (x.arguments as N[]).map((arg) => evalLiteral(arg));
+    if (args.some((arg) => arg === OPAQUE_LITERAL)) return undefined;
+    const name = x.callee.type === 'Identifier' ? x.callee.name : x.callee.property?.name;
+    return name === 'Color' && args.length === 1 ? (args[0] as PropValue) : (args as PropValue[]);
+  }
+  const v = evalLiteral(x);
+  return v === OPAQUE_LITERAL ? undefined : v;
+}

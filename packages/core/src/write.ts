@@ -2,7 +2,7 @@ import MagicString from 'magic-string';
 import { z } from 'zod';
 import type { N } from './ast';
 import { PrismError } from './errors';
-import { evalLiteral, isLiteral, OPAQUE_LITERAL, round3, valuesEqual } from './literal';
+import { isLiteral, round3, uniformValueOf, valuesEqual } from './literal';
 import type { PropValue } from './literal';
 import { analyze } from './read';
 import type { Analysis, PropInfo, SceneNode } from './read';
@@ -350,18 +350,6 @@ export function setProp(source: string, input: SetPropOp): WriteResult {
 
 // ---------- setUniform ----------
 
-function uniformValueOf(e: N): PropValue | undefined {
-  const x = unwrapTs(e);
-  if (x.type === 'NewExpression') {
-    const args = (x.arguments as N[]).map((arg) => evalLiteral(arg));
-    if (args.some((arg) => arg === OPAQUE_LITERAL)) return undefined;
-    const name = x.callee.type === 'Identifier' ? x.callee.name : x.callee.property?.name;
-    return name === 'Color' && args.length === 1 ? (args[0] as PropValue) : (args as PropValue[]);
-  }
-  const v = evalLiteral(x);
-  return v === OPAQUE_LITERAL ? undefined : v;
-}
-
 function objectProp(obj: N, key: string): N | null {
   if (obj?.type !== 'ObjectExpression') return null;
   for (const p of obj.properties as N[]) {
@@ -388,16 +376,16 @@ export function setUniform(source: string, input: SetUniformOp): WriteResult {
   assertWritable(entry.node);
   const uniforms = entry.attrs.get('uniforms');
   if (!uniforms) throw new PrismError('UNIFORM_NOT_FOUND', `<${entry.node.tag}> has no \`uniforms\` prop.`);
-  if (uniforms.info.kind === 'expression') {
-    throw new PrismError('OUT_OF_SUBSET', `\`uniforms\` on <${entry.node.tag}> is an expression (${uniforms.info.category}), not a literal or a same-file const, so it is read-only.`);
+  if (uniforms.info.kind === 'expression' && !uniforms.info.keys) {
+    throw new PrismError('OUT_OF_SUBSET', `\`uniforms\` on <${entry.node.tag}> is an expression (${uniforms.info.category}), not an object literal or a same-file const, so it is read-only.`);
   }
   const objExpr = uniforms.binding ? uniforms.binding.target : unwrapTs(uniforms.attr.value.expression);
   const entryProp = objectProp(objExpr, op.uniform);
-  if (!entryProp) throw new PrismError('UNIFORM_NOT_FOUND', `No literal uniform "${op.uniform}" on <${entry.node.tag}>. Known: ${Object.keys(uniforms.info.value && typeof uniforms.info.value === 'object' ? uniforms.info.value : {}).join(', ') || 'none'}.`);
+  if (!entryProp) throw new PrismError('UNIFORM_NOT_FOUND', `No literal uniform "${op.uniform}" on <${entry.node.tag}>. Known: ${(uniforms.info.keys ?? []).map((k) => k.name).join(', ') || 'none'}.`);
   const valueProp = objectProp(unwrapTs(entryProp.value), 'value');
   if (!valueProp) throw new PrismError('UNIFORM_NOT_FOUND', `Uniform "${op.uniform}" has no literal \`value\`.`);
   const vNode = unwrapTs(valueProp.value);
-  if (!isLiteral(vNode, 'value')) throw new PrismError('OUT_OF_SUBSET', `Uniform "${op.uniform}" has a non-literal value, so it is read-only.`);
+  if (!isLiteral(vNode, 'value')) throw new PrismError('OUT_OF_SUBSET', `Uniform "${op.uniform}" has a non-literal value, so it is read-only (other literal uniforms on this material stay editable).`);
 
   const cur = uniformValueOf(vNode);
   if (op.expected !== undefined && (cur === undefined || !valuesEqual(cur, op.expected))) {
@@ -431,8 +419,12 @@ export function setUniform(source: string, input: SetUniformOp): WriteResult {
     }
     const e2 = after.entries.find((e) => e.node.pathId === entry.node.pathId);
     const u = e2?.attrs.get('uniforms')?.info;
-    if (!e2 || !u || (u.kind !== 'literal' && u.kind !== 'resolved')) {
-      throw new PrismError('WRITE_VERIFICATION_FAILED', 'After the edit `uniforms` is no longer a literal; nothing was written.');
+    const key = u?.keys?.find((k) => k.name === op.uniform);
+    if (!e2 || !u || !key || key.kind !== 'literal') {
+      throw new PrismError('WRITE_VERIFICATION_FAILED', `After the edit uniform "${op.uniform}" is no longer a literal; nothing was written.`);
+    }
+    if (key.value !== undefined && !valuesEqual(key.value, op.value)) {
+      throw new PrismError('WRITE_VERIFICATION_FAILED', `After the edit uniform "${op.uniform}" does not hold the requested value; nothing was written.`);
     }
   });
 }

@@ -85,6 +85,11 @@ function declarationIn(statements: N[], name: string): Found | null {
   return null;
 }
 
+/** An object literal with only plain `key: value` properties (no spread, computed keys, methods). */
+export function isPlainObject(e: N): boolean {
+  return e?.type === 'ObjectExpression' && e.properties.every((p: N) => p.type === 'ObjectProperty' && !p.computed);
+}
+
 function isFunction(n: N): boolean {
   return n.type === 'FunctionDeclaration' || n.type === 'FunctionExpression' || n.type === 'ArrowFunctionExpression';
 }
@@ -94,7 +99,9 @@ function isFunction(n: N): boolean {
  * innermost first. Only simple `const` bindings qualify; anything else returns null and the
  * prop stays read-only. `parents` is the ancestor chain of the JSX attribute.
  */
-export function resolveBinding(ident: N, parents: N[], prop: string): ResolvedBinding | null {
+export function resolveBinding(ident: N, parents: N[], prop: string, partialObject = false): ResolvedBinding | null {
+  // `partialObject`: also accept an object literal whose values are not all literal (per-key uniforms editing)
+  const accept = (e: N): boolean => isLiteral(e, prop) || (partialObject && isPlainObject(e));
   for (let i = parents.length - 1; i >= 0; i--) {
     const p = parents[i];
     if (isFunction(p) && p.params.some((param: N) => patternNames(param).includes(ident.name))) {
@@ -108,10 +115,10 @@ export function resolveBinding(ident: N, parents: N[], prop: string): ResolvedBi
     const decl = found.declarator;
     if (!decl.init) return null;
     const init = unwrap(decl.init);
-    if (isLiteral(init, prop)) return { via: 'const', name: ident.name, declStart: decl.start, target: init };
+    if (accept(init)) return { via: 'const', name: ident.name, declStart: decl.start, target: init };
     if (isUseMemoCall(init)) {
       const result = useMemoResult(init);
-      if (result && isLiteral(result, prop)) return { via: 'useMemo', name: ident.name, declStart: decl.start, target: result };
+      if (result && accept(result)) return { via: 'useMemo', name: ident.name, declStart: decl.start, target: result };
     }
     return null;
   }
