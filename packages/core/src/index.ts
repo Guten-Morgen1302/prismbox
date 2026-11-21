@@ -23,3 +23,4 @@ export { instrument, OVERLAY_SPECIFIER, TAG_PROP, taggable } from './instrument'
 export type { InstrumentOptions, InstrumentResult } from './instrument';
 export { findNodeByTag, outline } from './outline';
 export type { OutlineEntry } from './outline';
+export { GUIDE } from './guide';
