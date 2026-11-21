@@ -9,5 +9,5 @@ if (!existsSync(`${from}/index.html`)) {
   process.exit(1);
 }
 rmSync(to, { recursive: true, force: true });
-cpSync(from, to, { recursive: true });
+cpSync(from, to, { recursive: true, filter: (src) => !src.endsWith('_headers') }); // static-host config is for the hosted Playground only
 console.log('studio copied into dist/studio');

@@ -1,7 +1,7 @@
 {
   "name": "prismbox",
-  "version": "0.0.1",
-  "description": "Agent-native visual editor for React Three Fiber. Early development.",
+  "version": "0.1.0",
+  "description": "Agent-native visual editor for React Three Fiber: drag objects on your real Vite page, edit as one-line diffs, and let a coding agent point at them over MCP.",
   "license": "MIT",
   "author": "Guten-Morgen1302",
   "repository": {
@@ -17,9 +17,13 @@
     "react-three-fiber",
     "r3f",
     "three",
+    "threejs",
     "visual-editor",
+    "vite",
     "mcp",
-    "claude-code"
+    "model-context-protocol",
+    "claude-code",
+    "cursor"
   ],
   "type": "module",
   "bin": {
@@ -56,5 +60,8 @@
     "three": "^0.187.0",
     "tsx": "^4.23.15",
     "vite": "^8.3.8"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

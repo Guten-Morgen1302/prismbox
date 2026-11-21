@@ -6,5 +6,5 @@ export default defineConfig({
   dts: true,
   clean: true,
   target: 'node20',
-  sourcemap: true,
+  sourcemap: false, // sources are not shipped, so maps would point at nothing
 });

@@ -78,8 +78,10 @@ describe('prismbox mcp: stdio hygiene (raw bytes)', () => {
       c.on('close', () => resolve(s));
     });
     expect(out).toContain('claude mcp add prismbox --');
+    expect(out).toMatch(/npx.*-y.*prismbox.*mcp.*--root/s); // the primary command is the npm one
     expect(out).toContain('"mcpServers"');
-    expect(out).toContain(fx.root.replace(/\\/g, '\\\\').replace(/\\\\/g, '\\\\')); // the root appears (JSON-escaped on Windows)
+    expect(out).toContain('Running from a source checkout'); // this test runs the CLI from the repo, so the local variant is offered too
+    expect(out).toContain('.cursor/mcp.json');
     expect(readdirSync(fx.root)).toEqual(before);
   });
 });

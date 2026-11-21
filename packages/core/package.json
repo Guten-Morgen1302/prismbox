@@ -1,6 +1,6 @@
 {
   "name": "@prismbox/core",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Parser, subset classifier and minimal-diff writer for React Three Fiber source files.",
   "license": "MIT",
   "author": "Guten-Morgen1302",
@@ -17,9 +17,11 @@
     "react-three-fiber",
     "r3f",
     "three",
+    "threejs",
     "ast",
     "codemod",
-    "visual-editor"
+    "visual-editor",
+    "magic-string"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -50,5 +52,9 @@
   },
   "devDependencies": {
     "@babel/types": "^7.29.14"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
   }
 }

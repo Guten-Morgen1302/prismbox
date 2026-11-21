@@ -15,6 +15,21 @@ async function exec(argv: string[]) {
   return { code, out, err };
 }
 
+import { printConfig } from '../src/mcp/run';
+
+describe('mcp setup snippets', () => {
+  it('prints npx commands for external users, a cmd /c wrapper on Windows, and the source-checkout variant only outside node_modules', () => {
+    const posix = printConfig('/p/app', '/usr/lib/node_modules/prismbox/dist/cli.js', 'linux');
+    expect(posix).toContain('claude mcp add prismbox -- npx -y prismbox mcp --root');
+    expect(posix).toContain('"command": "npx"');
+    expect(posix).not.toContain('source checkout');
+    const win = printConfig('C:\\p\\app', 'C:\\x\\node_modules\\prismbox\\dist\\cli.js', 'win32');
+    expect(win).toContain('claude mcp add prismbox -- cmd /c npx -y prismbox mcp --root');
+    expect(win).toContain('"command": "cmd"');
+    expect(printConfig('/p/app', '/work/prismbox/packages/bridge/dist/cli.js', 'linux')).toContain('source checkout');
+  });
+});
+
 describe('prismbox CLI', () => {
   it('--version and -v print the package version and exit 0', async () => {
     for (const flag of ['--version', '-v']) {

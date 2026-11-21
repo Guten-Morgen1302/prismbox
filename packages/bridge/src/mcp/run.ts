@@ -17,24 +17,27 @@ export function mcpHelp(): string {
 }
 
 /** Setup snippets only: nothing is written anywhere. */
-export function printConfig(root: string, cliPath: string): string {
+export function printConfig(root: string, cliPath: string, platform: NodeJS.Platform = process.platform): string {
   const abs = path.resolve(root);
   const q = (s: string) => (/[\s"]/.test(s) ? `"${s.replace(/"/g, '\\"')}"` : s);
-  const args = [cliPath, 'mcp', '--root', abs];
-  const json = JSON.stringify({ mcpServers: { prismbox: { command: 'node', args } } }, null, 2);
-  return [
-    '# Claude Code (run this once):',
-    `claude mcp add prismbox -- node ${args.map(q).join(' ')}`,
+  const npxArgs = ['-y', 'prismbox', 'mcp', '--root', abs];
+  // Windows launches MCP servers without a shell, so `npx` (a .cmd) must go through cmd /c
+  const [cmd, args] = platform === 'win32' ? ['cmd', ['/c', 'npx', ...npxArgs]] : ['npx', npxArgs];
+  const claude = `claude mcp add prismbox -- ${[cmd, ...args].map(q).join(' ')}`;
+  const json = JSON.stringify({ mcpServers: { prismbox: { command: cmd, args } } }, null, 2);
+  const lines = [
+    '# Claude Code (run once):',
+    claude,
     '',
-    '# Cursor (.cursor/mcp.json) or Windsurf (mcp_config.json): add this entry',
+    '# Cursor (.cursor/mcp.json) or Windsurf (~/.codeium/windsurf/mcp_config.json): add this entry',
     json,
     '',
-    '# Once prismbox is published you can use npx instead:',
-    `#   claude mcp add prismbox -- npx -y prismbox mcp --root ${q(abs)}`,
-    '',
-    'Then start prismbox in that project (`npx prismbox`), open your page, click an object, and tell the agent to edit "this".',
-    '',
-  ].join('\n');
+  ];
+  if (!/[\\/]node_modules[\\/]/.test(cliPath)) {
+    lines.push('# Running from a source checkout instead of npm:', `claude mcp add prismbox -- node ${[cliPath, 'mcp', '--root', abs].map(q).join(' ')}`, '');
+  }
+  lines.push('Then start prismbox in that project (`npx prismbox`), open your page, click an object, and tell the agent to edit "this".', '');
+  return lines.join('\n');
 }
 
 /**
