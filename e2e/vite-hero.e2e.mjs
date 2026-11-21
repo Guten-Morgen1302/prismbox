@@ -4,7 +4,12 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { chromium } from 'playwright';
+import { PNG } from 'pngjs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import os from 'node:os';
 
 const repo = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const example = path.join(repo, 'examples', 'vite-hero');
@@ -55,7 +60,10 @@ const changedLines = (a, b) => {
 const ORIGINAL = readHero();
 const gitStatus = () => execFileSync('git', ['status', '--porcelain', '--', 'examples/vite-hero'], { cwd: repo, encoding: 'utf8' });
 const STATUS_BEFORE = gitStatus();
-const cli = spawn(process.execPath, [path.join(repo, 'packages', 'bridge', 'dist', 'cli.js'), '--root', example, '--no-open', '--port', '4173'], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
+// the session registry goes to a temp home, so the run never touches the real ~/.prismbox
+const prismHome = mkdtempSync(path.join(os.tmpdir(), 'prismbox-e2e-home-'));
+const CLI_JS = path.join(repo, 'packages', 'bridge', 'dist', 'cli.js');
+const cli = spawn(process.execPath, [CLI_JS, '--root', example, '--no-open', '--port', '4173'], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PRISMBOX_HOME: prismHome } });
 let out = '';
 cli.stdout.on('data', (d) => (out += d));
 cli.stderr.on('data', (d) => (out += d));
@@ -64,6 +72,7 @@ const stopAll = async (browser) => {
   cli.kill();
   await sleep(300);
   writeFileSync(heroFile, ORIGINAL); // never leave the example modified
+  rmSync(prismHome, { recursive: true, force: true });
 };
 
 let browser;
@@ -251,6 +260,97 @@ try {
   await until(async () => Math.abs((await page.evaluate(() => window.__prismDebug.uniform('knot', 'uFilm'))) - 1.4) < 0.001, { what: 'HMR after undo' });
   check('5. ... and the real page followed (HMR)', (await page.evaluate(() => window.__marker)) === 'alive');
 
+
+  // ======== M3: a real MCP client (stdio) against the same daemon ========
+  const mcpTransport = new StdioClientTransport({ command: process.execPath, args: [CLI_JS, 'mcp', '--root', example], env: { ...process.env, PRISMBOX_HOME: prismHome }, stderr: 'pipe' });
+  const mcp = new Client({ name: 'e2e-agent', version: '0' });
+  let mcpStderr = '';
+  await mcp.connect(mcpTransport);
+  mcpTransport.stderr?.on('data', (d) => (mcpStderr += d));
+  const tool = (name, args = {}) => mcp.callTool({ name, arguments: args });
+  const txt = (r) => r.content.find((c) => c.type === 'text')?.text ?? '';
+  const parsed = (r) => JSON.parse(txt(r));
+  const sessionFiles = () => (existsSync(path.join(prismHome, 'sessions')) ? readdirSync(path.join(prismHome, 'sessions')) : []);
+  check('M3.1 the daemon published its session OUTSIDE the project (~/.prismbox/sessions/<hash>.json)', sessionFiles().length === 1 && !existsSync(path.join(example, '.prismbox')), JSON.stringify(sessionFiles()));
+  const tools = (await mcp.listTools()).tools.map((t) => t.name).sort();
+  check('M3.1 prismbox mcp exposes the 6 tools', JSON.stringify(tools) === JSON.stringify(['prism_get_scene', 'prism_get_selection', 'prism_get_view', 'prism_lint', 'prism_set_prop', 'prism_set_uniform']), tools.join());
+
+  // 2. click the knot on the real page, ask for the selection
+  check('M3.2 the knot can be picked on the real page (armed)', await pickKnot());
+  const sel = parsed(await tool('prism_get_selection'));
+  check('M3.2 prism_get_selection returns the exact file:line:col and node details', sel.selected === true && sel.tag === KNOT && sel.name === 'knot' && sel.file === 'src/Hero3D.tsx' && sel.element === 'mesh' && /<mesh name="knot"/.test(sel.snippet), JSON.stringify(sel).slice(0, 300));
+  check('M3.2 ... with its props (the literal position)', sel.props.some((p) => p.name === 'position' && Array.isArray(p.value)), JSON.stringify(sel.props.map((p) => p.name)));
+  await until(async () => /Hero3D\.tsx:\d+/.test(await studio.textContent('[data-testid=agent-selection]').catch(() => '')), { what: 'the "Selected for agent" indicator' });
+  check('M3.2 Studio shows "Selected for agent · Hero3D.tsx:<line>"', true, await studio.textContent('[data-testid=agent-selection]'));
+
+  // 3. prism_get_view armed and disarmed
+  const pngStats = (b64) => {
+    const png = PNG.sync.read(Buffer.from(b64, 'base64'));
+    let nonBlack = 0, axis = 0;
+    for (let i = 0; i < png.data.length; i += 4) {
+      const r = png.data[i], g = png.data[i + 1], b = png.data[i + 2];
+      if (0.2126 * r + 0.7152 * g + 0.0722 * b > 14) nonBlack++;
+      if ((r > 235 && g < 25 && b < 25) || (g > 235 && r < 25 && b < 25) || (b > 235 && r < 25 && g < 25)) axis++; // the gizmo's pure x/y/z colours
+    }
+    return { w: png.width, h: png.height, nonBlackPct: (100 * nonBlack) / (png.width * png.height), axis };
+  };
+  const viewArmed = await tool('prism_get_view');
+  const imgA = viewArmed.content.find((c) => c.type === 'image');
+  const sA = pngStats(imgA.data);
+  const metaA = JSON.parse(viewArmed.content.find((c) => c.type === 'text').text);
+  if (SHOTS) writeFileSync(path.join(SHOTS, 'mcp-view-armed.png'), Buffer.from(imgA.data, 'base64'));
+  check('M3.3 armed: prism_get_view returns a real PNG image block', imgA.mimeType === 'image/png' && sA.w > 100 && sA.h > 100 && sA.w <= 1280, JSON.stringify(sA));
+  check('M3.3 ... that is not blank or all black', sA.nonBlackPct > 5, JSON.stringify(sA));
+  const shot = await page.screenshot();
+  const shotStats = pngStats(shot.toString('base64'));
+  check('M3.3 ... with the gizmo hidden (the live page shows it, the capture does not)', shotStats.axis > 40 && sA.axis < shotStats.axis / 4, `capture ${sA.axis} vs page ${shotStats.axis}`);
+  check('M3.3 ... plus camera and viewport metadata, and armed=true', metaA.armed === true && metaA.camera?.fov === 40 && metaA.viewport?.cssWidth > 100, JSON.stringify(metaA));
+  check('M3.3 the gizmo is back on the live page after the capture', (await page.screenshot().then((b) => pngStats(b.toString('base64')).axis)) > 40);
+  await studio.click('button.arm');
+  await until(async () => (await modeText()) === 'Disarmed', { what: 'Studio to show Disarmed' });
+  const viewOff = await tool('prism_get_view');
+  const sD = pngStats(viewOff.content.find((c) => c.type === 'image').data);
+  check('M3.3 disarmed: prism_get_view works too and is not blank', sD.nonBlackPct > 5 && JSON.parse(viewOff.content.find((c) => c.type === 'text').text).armed === false, JSON.stringify(sD));
+
+  // 4. agent edits: no arming needed
+  const beforeAgent = readHero();
+  const rUniform = await tool('prism_set_uniform', { node: 'film', uniform: 'uFilm', value: 2.2 });
+  check('M3.4 prism_set_uniform succeeds while DISARMED and returns a unified one-line diff', !rUniform.isError && /--- a\/src\/Hero3D\.tsx/.test(txt(rUniform)) && /\+.*uFilm: \{ value: 2\.2 \}/.test(txt(rUniform)), txt(rUniform).slice(0, 300));
+  const afterUniformMcp = await until(() => (readHero().equals(beforeAgent) ? null : readHero()), { what: 'the agent uniform edit on disk' });
+  const dU = changedLines(beforeAgent, afterUniformMcp);
+  check('M3.4 exactly one line changed on disk (uFilm literal)', dU.count === 1 && dU.lines[0].after.includes('uFilm: { value: 2.2 }'), JSON.stringify(dU));
+  await until(async () => Math.abs((await page.evaluate(() => window.__prismDebug.uniform('knot', 'uFilm'))) - 2.2) < 0.001, { what: 'HMR to apply the agent uniform' });
+  check('M3.4 Vite HMR updated the real page (no reload)', (await page.evaluate(() => window.__marker)) === 'alive');
+  const rProp = await tool('prism_set_prop', { prop: 'position', value: [0.3, 0.1, 0] }); // no node: edits "this" (the selected knot)
+  check('M3.4 prism_set_prop with no node edits the selected node ("this")', !rProp.isError && /position=\{\[0\.3, 0\.1, 0\]\}/.test(txt(rProp)), txt(rProp).slice(0, 300));
+  const afterPropMcp = await until(() => (readHero().equals(afterUniformMcp) ? null : readHero()), { what: 'the agent prop edit on disk' });
+  const dP = changedLines(afterUniformMcp, afterPropMcp);
+  check('M3.4 ... one line changed on disk', dP.count === 1 && /<mesh name="knot" position=\{\[0\.3, 0\.1, 0\]\}/.test(dP.lines[0].after), JSON.stringify(dP));
+  await until(async () => { const p = await page.evaluate(() => window.__prismDebug.localPosition('knot')); return p && Math.abs(p[0] - 0.3) < 0.002 && Math.abs(p[1] - 0.1) < 0.002; }, { what: 'HMR to apply the agent position' });
+  const stale = await tool('prism_set_prop', { node: 'knot', prop: 'position', value: [9, 9, 9], expected: [5, 5, 5] });
+  check('M3.4 a stale agent edit is refused (CONFLICT) and the file is untouched', stale.isError && parsed(stale).code === 'CONFLICT' && readHero().equals(afterPropMcp), txt(stale).slice(0, 200));
+  await until(async () => (await studio.locator('.diff-row .author.agent').count()) >= 2, { what: 'agent diff rows in Studio' });
+  check('M3.4 Studio shows both edits with the "agent" badge', true);
+  if (SHOTS) await studio.screenshot({ path: path.join(SHOTS, 'studio-agent.png') });
+
+  // 5. one-click undo in Studio, twice
+  for (let i = 0; i < 2; i++) {
+    await until(async () => !(await studio.locator('.diff-strip button', { hasText: 'Undo' }).isDisabled()), { what: 'Undo to enable (agent)' });
+    await studio.locator('.diff-strip button', { hasText: 'Undo' }).click();
+    await sleep(400);
+  }
+  await until(() => readHero().equals(ORIGINAL), { what: 'agent edits to be undone' });
+  check('M3.5 two Undo clicks in Studio restore Hero3D.tsx byte-exact', readHero().equals(ORIGINAL));
+
+  // 6. lint and the guide
+  const lint = parsed(await tool('prism_lint'));
+  check('M3.6 prism_lint returns structured coverage and findings', lint.ok === true && lint.editableCoverage >= 0.9 && Array.isArray(lint.files) && lint.files.some((f) => f.file === 'src/Hero3D.tsx' && Array.isArray(f.findings)), JSON.stringify(lint).slice(0, 300));
+  const scene = parsed(await tool('prism_get_scene', { file: 'src/Hero3D.tsx' }));
+  check('M3.6 prism_get_scene returns the node tree with edit states', scene.files?.[0]?.nodes?.some((n) => n.name === 'knot' && n.edit === 'editable'), JSON.stringify(scene).slice(0, 200));
+  const guide = await mcp.readResource({ uri: 'prismbox://guide' });
+  check('M3.6 prismbox://guide is readable and is the authoring guide', guide.contents[0].mimeType === 'text/markdown' && /Prism subset/.test(guide.contents[0].text) && /@prism uniform/.test(guide.contents[0].text));
+  check('M3.6 the MCP process kept stdout clean (the client parsed every frame) and logged to stderr', /ready for/.test(mcpStderr));
+
   // ======== 6. external edit (Claude Code, VS Code) ========
   const external = ORIGINAL.toString().replace('args={[1, 0.34, 400, 64, 2, 3]}', 'args={[1.1, 0.34, 400, 64, 2, 3]}');
   const oldHash = await studio.evaluate(() => window.__prismStudio.hash());
@@ -272,8 +372,13 @@ try {
   await until(async () => (await studio.locator('.diff-row').count()) >= 2, { what: 'external restore diff' });
 
   // ======== 7. production build: zero Prismbox bytes, clean git status ========
+  check('M3.7 the project has no .prismbox folder and no stray files (git status clean)', !existsSync(path.join(example, '.prismbox')) && gitStatus() === '', gitStatus());
   cli.kill();
-  await sleep(500);
+  await sleep(800);
+  const offline = await tool('prism_get_selection');
+  check('M3.7 after the daemon dies, the stale session is pruned and the agent gets a graceful DAEMON_OFFLINE', offline.isError && parsed(offline).code === 'DAEMON_OFFLINE' && sessionFiles().length === 0, `${txt(offline).slice(0, 160)} files=${sessionFiles().length}`);
+  check('M3.7 prism_lint and the guide still work offline', parsed(await tool('prism_lint')).ok === true && (await mcp.readResource({ uri: 'prismbox://guide' })).contents.length === 1);
+  await mcp.close();
   // the dev server and daemon have just been stopped; on Windows their file handles can linger for a moment, so retry once and show vite's own output on failure
   let built = null;
   for (let attempt = 0; attempt < 3 && !built?.ok; attempt++) {
