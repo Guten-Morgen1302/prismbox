@@ -10,7 +10,7 @@
 [![Node >=20](https://img.shields.io/badge/node-%3E%3D20-3c873a?logo=node.js&logoColor=white)](package.json)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[**Live Playground**](#live-playground) · [Quickstart](#quickstart) · [MCP Tools](#mcp-tools) · [Templates](#hero-templates) · [Security](#security-model) · [Contributing](#contributing)
+[**Live Playground**](https://prismbox.harshabhaypatil.workers.dev) · [Quickstart](#quickstart) · [MCP Tools](#mcp-tools) · [Templates](#hero-templates) · [Security](#security-model) · [Contributing](#contributing)
 
 </div>
 
@@ -62,9 +62,9 @@ On Windows, MCP clients start servers without a shell: use `"command": "cmd", "a
 
 ## Live Playground
 
-<!-- PLAYGROUND_URL -->
+**[prismbox.harshabhaypatil.workers.dev](https://prismbox.harshabhaypatil.workers.dev)**
 
-The Playground is Studio on an in-memory file system: pick one of the [six templates](#hero-templates), drag, scrub, and copy the resulting `.tsx`. It edits templates, not your repo. The hosted copy is not live yet; run it locally with `pnpm --filter @prismbox/studio dev` (see [Develop](#develop)).
+The Playground is Studio on an in-memory file system: pick one of the [six templates](#hero-templates), drag, scrub, and copy the resulting `.tsx`. It edits templates, not your repo. To run it locally instead: `pnpm --filter @prismbox/studio dev` (see [Develop](#develop)).
 
 ## MCP tools
 
