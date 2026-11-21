@@ -27,3 +27,5 @@ pnpm --filter @prismbox/studio dev     # http://127.0.0.1:4173/?template=<your-i
 ```
 
 Add an entry to `packages/templates/manifest.json` (`id` = file name without `.tsx`). Judge it in Studio at 1440x900: if it looks flat, washed out or badly framed, iterate on lighting, camera and contrast before opening a PR.
+
+You can also check a template the way an agent would: with the Prismbox MCP server connected, `prism_lint` on the file reports editable coverage and findings with fixes (it works without the daemon). CI enforces the same rules through `pnpm --filter @prismbox/templates test`.
