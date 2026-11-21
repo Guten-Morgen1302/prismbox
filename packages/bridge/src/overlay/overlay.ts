@@ -290,8 +290,55 @@ export function __PrismOverlay() {
       }
     }
 
+    // prism_get_view: render synchronously and read the canvas in the SAME task (no preserveDrawingBuffer needed), gizmo and
+    // selection box hidden. Wider than 1280 px is downscaled so the image stays a sensible size for an agent.
+    function captureNow() {
+      const vis = helper.visible;
+      const bvis = box.visible;
+      helper.visible = false;
+      box.visible = false;
+      try {
+        gl.render(scene, get().camera);
+        let url = dom.toDataURL('image/png');
+        let width = dom.width;
+        let height = dom.height;
+        if (width > 1280) {
+          const c = document.createElement('canvas');
+          c.width = 1280;
+          c.height = Math.round((height * 1280) / width);
+          const ctx = c.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(dom, 0, 0, c.width, c.height);
+            url = c.toDataURL('image/png');
+            width = c.width;
+            height = c.height;
+          }
+        }
+        return { url, width, height };
+      } finally {
+        helper.visible = vis;
+        box.visible = bvis;
+      }
+    }
+
     S.apply = (m) => {
       switch (m.type) {
+        case 'capture': {
+          const id = m.id as number;
+          try {
+            const cam = get().camera as THREE.PerspectiveCamera;
+            const out = captureNow();
+            const r = dom.getBoundingClientRect();
+            send({
+              type: 'capture-result', id, ok: true, ...out,
+              camera: { position: triple(cam.position), rotation: triple(cam.rotation), fov: typeof cam.fov === 'number' ? round3(cam.fov) : null, type: cam.type },
+              viewport: { cssWidth: Math.round(r.width), cssHeight: Math.round(r.height), dpr: window.devicePixelRatio },
+            });
+          } catch (e) {
+            send({ type: 'capture-result', id, ok: false, error: e instanceof Error ? e.message : String(e) });
+          }
+          break;
+        }
         case 'arm':
           S.armed = m.value === true;
           badge.style.display = S.armed ? 'block' : 'none';
@@ -375,17 +422,7 @@ export function __PrismOverlay() {
       /** Send a raw proposal as a page would (used to test that the daemon refuses forged or disarmed edits). */
       forgeProposal: (tag: string, changes: Changes) => propose(tag, changes),
       /** prism_get_view (M3): synchronous render + read in the SAME task, gizmo hidden. Needs no preserveDrawingBuffer. */
-      capture: () => {
-        const vis = helper.visible;
-        const bvis = box.visible;
-        helper.visible = false;
-        box.visible = false;
-        gl.render(scene, get().camera);
-        const url = dom.toDataURL('image/png');
-        helper.visible = vis;
-        box.visible = bvis;
-        return { url, width: dom.width, height: dom.height };
-      },
+      capture: () => captureNow(),
     };
 
     return () => {

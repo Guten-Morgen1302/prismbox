@@ -11,6 +11,9 @@ export type ErrorCode =
   | 'UNDO_CONFLICT'
   | 'NOTHING_TO_UNDO'
   | 'DISARMED'
+  | 'NO_PAGE'
+  | 'NO_SELECTION'
+  | 'CAPTURE_FAILED'
   | 'RATE_LIMITED'
   | 'INVALID_PROPOSAL'
   | 'BAD_REQUEST'
@@ -32,7 +35,7 @@ export interface FileSnap {
   hash: string;
 }
 
-export type DiffAuthor = 'you' | 'page' | 'external';
+export type DiffAuthor = 'you' | 'page' | 'external' | 'agent';
 
 export interface DiffWire {
   id: number;
@@ -89,6 +92,17 @@ export const PageMsg = z.discriminatedUnion('type', [
   z.object({ type: z.literal('pick'), tag: z.string().max(600).nullable() }),
   z.object({ type: z.literal('frozen'), value: z.boolean() }),
   z.object({
+    type: z.literal('capture-result'),
+    id: z.number().int(),
+    ok: z.boolean(),
+    url: z.string().max(24 * 1024 * 1024).optional(),
+    width: z.number().int().optional(),
+    height: z.number().int().optional(),
+    camera: z.object({ position: Triple, rotation: Triple, fov: z.number().nullable(), type: z.string().max(40) }).optional(),
+    viewport: z.object({ cssWidth: z.number(), cssHeight: z.number(), dpr: z.number() }).optional(),
+    error: z.string().max(500).optional(),
+  }),
+  z.object({
     type: z.literal('proposal'),
     id: z.number().int(),
     tag: z.string().min(3).max(600),
@@ -124,6 +138,7 @@ export type ToPage =
   | { type: 'select'; tag: string | null }
   | { type: 'view'; mode: 'scene' | 'free' }
   | { type: 'gizmo'; mode: 'translate' | 'rotate' | 'scale' }
+  | { type: 'capture'; id: number }
   | { type: 'live'; tag: string; prop: string; value: unknown; uniform?: boolean }
   | { type: 'proposal-result'; id: number; ok: boolean; code?: ErrorCode; message?: string };
 

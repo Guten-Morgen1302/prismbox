@@ -1,4 +1,5 @@
 import { findNodeByTag, readScene } from '@prismbox/core';
+import { describeTag, lintFile, sceneFile, unified } from '../agent/describe';
 import type { Op } from '@prismbox/core';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { createReadStream, promises as fs, watch as fsWatch } from 'node:fs';
@@ -32,6 +33,8 @@ export interface DaemonOptions {
   entry?: string;
   /** Turn the disk watcher off (tests drive `onDiskChange` directly). */
   watch?: boolean;
+  /** How long to wait for the page to answer a capture. */
+  captureTimeoutMs?: number;
 }
 
 const MIME: Record<string, string> = {
@@ -79,6 +82,9 @@ export function createDaemon(opts: DaemonOptions): Daemon {
   let rejected = 0;
   let watcher: FSWatcher | null = null;
   let pageUrl: string | null = null;
+  let selectionTag: string | null = null;
+  const captures = new Map<number, (r: Extract<PageMsg, { type: 'capture-result' }>) => void>();
+  let nextCapture = 1;
   const timers = new Map<string, NodeJS.Timeout>();
   const now = () => (opts.now ?? Date.now)();
 
@@ -196,6 +202,7 @@ export function createDaemon(opts: DaemonOptions): Daemon {
         return;
       }
       case 'select':
+        selectionTag = m.tag;
         toPages({ type: 'select', tag: m.tag });
         return;
       case 'live':
@@ -266,7 +273,11 @@ export function createDaemon(opts: DaemonOptions): Daemon {
   async function onPage(c: Client, m: PageMsg): Promise<void> {
     switch (m.type) {
       case 'pick':
+        selectionTag = m.tag;
         toStudios({ type: 'pick', tag: m.tag });
+        return;
+      case 'capture-result':
+        captures.get(m.id)?.(m);
         return;
       case 'frozen':
         toStudios({ type: 'frozen', value: m.value });
@@ -318,6 +329,98 @@ export function createDaemon(opts: DaemonOptions): Daemon {
     }
   }
 
+  // ---------------- agent API (MCP) ----------------
+  /** Ask a connected page for a screenshot. The page renders synchronously and reads the canvas in the same task. */
+  async function capture(): Promise<Extract<PageMsg, { type: 'capture-result' }>> {
+    const page = pages()[0];
+    if (!page) throw new DaemonError('NO_PAGE', 'No page is connected. Open your app in the browser (the URL prismbox printed) and try again.');
+    const id = nextCapture++;
+    const timeoutMs = opts.captureTimeoutMs ?? 6000;
+    return new Promise((resolve, reject) => {
+      const t = setTimeout(() => {
+        captures.delete(id);
+        reject(new DaemonError('CAPTURE_FAILED', `The page did not answer within ${timeoutMs} ms. Is the tab open and the 3D canvas mounted?`));
+      }, timeoutMs);
+      captures.set(id, (r) => {
+        clearTimeout(t);
+        captures.delete(id);
+        if (!r.ok || !r.url) reject(new DaemonError('CAPTURE_FAILED', r.error ?? 'The page could not capture the canvas.'));
+        else resolve(r);
+      });
+      send(page, { type: 'capture', id });
+    });
+  }
+
+  async function readBody(req: IncomingMessage): Promise<unknown> {
+    const chunks: Buffer[] = [];
+    let n = 0;
+    for await (const c of req) {
+      n += (c as Buffer).length;
+      if (n > 256 * 1024) throw new DaemonError('BAD_REQUEST', 'Request body too large.');
+      chunks.push(c as Buffer);
+    }
+    try {
+      return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+    } catch {
+      throw new DaemonError('BAD_REQUEST', 'Body is not JSON.');
+    }
+  }
+
+  async function handleApi(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+    // Only a caller holding the Studio token (the MCP server, via the session file). A browser sends Origin: refuse it outright.
+    const auth = req.headers.authorization ?? '';
+    if (req.headers.origin !== undefined || !auth.startsWith('Bearer ') || !safeEqual(auth.slice(7), opts.token)) return json(res, 401, { ok: false, code: 'BAD_REQUEST', message: 'Unauthorized.' });
+    const route = url.pathname.slice('/__prism/api/'.length);
+    if (req.method === 'GET' && route === 'status') {
+      return json(res, 200, { ok: true, root: project.root, armed, page: pages().length > 0, studio: studios().length > 0, selection: selectionTag, file: current?.path ?? null, version: opts.version ?? '0.0.0' });
+    }
+    if (req.method === 'GET' && route === 'selection') {
+      if (!selectionTag) return json(res, 200, { ok: true, selected: false, message: 'Nothing is selected. Ask the user to click an object on their page, or pick a node in Studio.' });
+      const d = await describeTag(project, selectionTag);
+      return json(res, 200, d.ok ? { ok: true, selected: true, ...d.node } : { ok: true, selected: false, stale: true, message: d.reason });
+    }
+    if (req.method === 'GET' && route === 'scene') {
+      const file = url.searchParams.get('file');
+      const list = file ? [(await project.resolve(file)).rel] : files.length ? files : await project.listScenes();
+      return json(res, 200, { ok: true, files: await Promise.all(list.map((f) => sceneFile(project, f))) });
+    }
+    if (req.method === 'GET' && route === 'lint') {
+      const file = url.searchParams.get('file');
+      const list = file ? [(await project.resolve(file)).rel] : files.length ? files : await project.listScenes();
+      return json(res, 200, { ok: true, files: await Promise.all(list.map((f) => lintFile(project, f))) });
+    }
+    if (req.method === 'GET' && route === 'view') {
+      const r = await capture();
+      return json(res, 200, { ok: true, png: (r.url as string).replace(/^data:image\/png;base64,/, ''), width: r.width, height: r.height, camera: r.camera, viewport: r.viewport, armed, selection: selectionTag });
+    }
+    if (req.method === 'POST' && route === 'edit') {
+      const b = (await readBody(req)) as { kind?: string; file?: string; node?: string; prop?: string; uniform?: string; value?: unknown; expected?: unknown; baseHash?: string };
+      // "edit this": with no node, the target is whatever the user has selected
+      let file = b.file;
+      let node = b.node;
+      if (!node) {
+        const m = selectionTag ? /^(.+):(\d+):(\d+)$/.exec(selectionTag) : null;
+        if (!m) throw new DaemonError('NO_SELECTION', 'No node given and nothing is selected. Pass `node` (a name from prism_get_scene) or ask the user to select an object.');
+        const snap = await project.read(m[1] as string);
+        const n = findNodeByTag(readScene(snap.source, snap.path), selectionTag as string);
+        if (!n) throw new DaemonError('NODE_NOT_FOUND', `The selected node at ${selectionTag} no longer exists. Ask the user to select it again.`);
+        node = n.id;
+        file ??= snap.path;
+      }
+      file ??= current?.path;
+      if (!file) throw new DaemonError('BAD_REQUEST', 'No file given and no scene file is open.');
+      const op: Op =
+        b.kind === 'uniform'
+          ? { op: 'setUniform', node, uniform: String(b.uniform), value: b.value as never, ...(b.expected === undefined ? {} : { expected: b.expected as never }) }
+          : { op: 'setProp', node, prop: String(b.prop), value: b.value as never, ...(b.expected === undefined ? {} : { expected: b.expected as never }) };
+      const summary = b.kind === 'uniform' ? `uniform ${String(b.uniform)}` : String(b.prop);
+      const r = await project.edit(file, [op], { ...(b.baseHash ? { baseHash: b.baseHash } : {}), author: 'agent', summary });
+      if (r.changed) afterWrite(r.file, r.diff, 'edit');
+      return json(res, 200, { ok: true, changed: r.changed, file: r.file.path, node, hash: r.file.hash, diff: r.diff ? { line: r.diff.line, before: r.diff.before, after: r.diff.after, unified: unified(r.file.path, r.diff) } : null, undo: await undoState() });
+    }
+    return json(res, 404, { ok: false, code: 'BAD_REQUEST', message: 'Unknown API route.' });
+  }
+
   // ---------------- HTTP ----------------
   const json = (res: ServerResponse, status: number, body: unknown, extra: Record<string, string> = {}) => {
     res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...extra });
@@ -366,11 +469,13 @@ export function createDaemon(opts: DaemonOptions): Daemon {
       pageTokens.set(token, now() + 60_000);
       return json(res, 200, { token }, { 'access-control-allow-origin': origin, vary: 'Origin' });
     }
+    if (url.pathname.startsWith('/__prism/api/')) return void handleApi(req, res, url).catch((e) => { const er = errorOf(e); json(res, er.code === 'INTERNAL' ? 500 : 400, { ok: false, ...er }); });
     if (req.method !== 'GET' && req.method !== 'HEAD') return json(res, 405, { error: 'method not allowed' });
     void serveStatic(req, res).catch(() => json(res, 500, { error: 'internal' }));
   });
 
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
+  // pages may send screenshots (bounded, validated); Studio messages are small and checked below
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 24 * 1024 * 1024 });
   server.on('upgrade', (req, socket, head) => {
     const deny = (code: number) => {
       socket.write(`HTTP/1.1 ${code} Forbidden\r\nConnection: close\r\n\r\n`);
@@ -393,6 +498,7 @@ export function createDaemon(opts: DaemonOptions): Daemon {
     const helloTimer = setTimeout(() => !c.authed && ws.close(4401, 'hello timeout'), 3000);
     ws.on('message', (data: RawData) => {
       void (async () => {
+        if (kind === 'studio' && (data as Buffer).length > 1024 * 1024) return ws.close(1009, 'too big');
         let raw: unknown;
         try {
           raw = JSON.parse(data.toString());

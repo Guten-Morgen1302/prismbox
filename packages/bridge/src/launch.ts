@@ -7,6 +7,7 @@ import { createDaemon } from './daemon/server';
 import type { Daemon } from './daemon/server';
 import { detect, loadUserVite } from './detect';
 import { prismboxPlugin } from './plugin';
+import { prismHome, removeSession, writeSession } from './session-file';
 
 export interface LaunchOptions {
   root: string;
@@ -48,6 +49,11 @@ export async function launch(opts: LaunchOptions): Promise<Running> {
   const token = randomBytes(24).toString('base64url');
   const daemon = createDaemon({ root: project.root, token, port: opts.port ?? 4173, version: opts.version, studioDir: studioDir(), ...(opts.entry ? { entry: opts.entry } : {}) });
   const { port, origin } = await daemon.listen();
+  // The session descriptor lives in ~/.prismbox (never in the project), so `prismbox mcp` can find this daemon.
+  const home = prismHome();
+  writeSession(home, { port, token, pid: process.pid, root: project.root, startedAt: new Date().toISOString(), version: opts.version });
+  const dropSession = () => removeSession(home, project.root, process.pid);
+  process.once('exit', dropSession);
 
   const vite = await loadUserVite(project.root);
   let server: Awaited<ReturnType<typeof vite.createServer>>;
@@ -55,6 +61,7 @@ export async function launch(opts: LaunchOptions): Promise<Running> {
     server = await vite.createServer({ root: project.root, clearScreen: false, plugins: [prismboxPlugin({ daemonOrigin: origin }) as never] });
     await server.listen();
   } catch (e) {
+    dropSession();
     await daemon.close();
     throw e;
   }
@@ -83,6 +90,7 @@ export async function launch(opts: LaunchOptions): Promise<Running> {
     studioUrl,
     pageUrl,
     async close() {
+      dropSession();
       await Promise.allSettled([server.close(), daemon.close()]);
     },
   };
