@@ -15,4 +15,13 @@ Studio opens **disarmed**. Arm it to drag objects directly on your real page; ea
 
 Options: `--root <dir>`, `--port <n>`, `--no-open`, `-v`, `-h`.
 
+## Connect your coding agent (MCP)
+
+```bash
+prismbox mcp --print-config --root .      # prints the exact commands; changes nothing
+claude mcp add prismbox -- npx -y prismbox mcp --root /path/to/project
+```
+
+With `prismbox` running, click an object on your page and tell the agent "make *this* glassier": it calls `prism_get_selection`, looks with `prism_get_view`, and edits with `prism_set_prop` / `prism_set_uniform`. Every agent edit is a one-line diff tagged `agent` in Studio, with one-click undo. Tools: `prism_get_selection`, `prism_get_view`, `prism_get_scene`, `prism_set_prop`, `prism_set_uniform`, `prism_lint`; resource `prismbox://guide`. The session descriptor lives in `~/.prismbox/sessions`, never in your project.
+
 MIT licensed.

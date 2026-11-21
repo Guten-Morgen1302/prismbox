@@ -21,6 +21,7 @@ export function helpText(): string {
     '',
     'Usage:',
     '  prismbox [dev] [file] [options]   Start Studio and your Vite dev server, side by side',
+    '  prismbox mcp [--root <dir>]       MCP server for your coding agent (see `prismbox mcp --help`)',
     '',
     'Options:',
     '  --root <dir>   Project folder (default: the current directory)',
@@ -72,6 +73,10 @@ export function parseArgs(argv: readonly string[]): Parsed | { error: string } {
 
 /** Run the CLI and return the process exit code. `dev` resolves only when the servers stop. */
 export async function run(argv: readonly string[], io: Io, onReady?: (stop: () => Promise<void>) => void): Promise<number> {
+  if (argv[0] === 'mcp') {
+    const { runMcp } = await import('./mcp/run');
+    return runMcp(argv.slice(1), io, version());
+  }
   const p = parseArgs(argv);
   if ('error' in p) {
     io.err(`prismbox: ${p.error} Run \`prismbox --help\`.\n`);

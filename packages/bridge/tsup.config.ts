@@ -6,10 +6,11 @@ export default defineConfig([
     format: ['esm'],
     platform: 'node',
     target: 'node20',
-    clean: true,
+    // not `clean`: dist/studio is copied in by the build script and must survive a plain `tsup` (the tests run one)
+    clean: false,
     sourcemap: true,
     // the user's Vite is loaded at runtime from their project; never bundle it
-    external: ['vite'],
+    external: ['vite', '@modelcontextprotocol/sdk'],
   },
   {
     // runs in the user's page: react, three and R3F must resolve to the USER's copies

@@ -30,6 +30,7 @@ describe('prismbox CLI', () => {
       expect(r.code).toBe(0);
       expect(r.out).toBe(helpText());
       expect(r.out).toContain('prismbox [dev]');
+      expect(r.out).toContain('prismbox mcp');
     }
   });
 
