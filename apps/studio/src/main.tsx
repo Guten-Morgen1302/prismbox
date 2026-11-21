@@ -4,16 +4,7 @@ import { App } from './App';
 import { LocalApp } from './local/LocalApp';
 import './styles.css';
 
-/** Local mode when this page is served by the prismbox daemon, otherwise the Playground. */
-async function detectLocal(): Promise<boolean> {
-  try {
-    const res = await fetch('/__prism/session', { signal: AbortSignal.timeout(1500) });
-    if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return false;
-    return ((await res.json()) as { prismbox?: boolean }).prismbox === true;
-  } catch {
-    return false;
-  }
-}
-
-const local = await detectLocal();
+// Local mode only when the prismbox daemon served this page (it adds the marker to index.html). On a static host there is
+// no daemon, nothing is probed, and the Playground runs with no local-mode UI at all.
+const local = document.querySelector('meta[name="prismbox-local"]') !== null;
 createRoot(document.getElementById('root') as HTMLElement).render(<StrictMode>{local ? <LocalApp /> : <App />}</StrictMode>);

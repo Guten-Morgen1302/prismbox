@@ -1,4 +1,5 @@
 import type { TemplateInfo } from '../templates';
+import { GitHubLink, RunLocally } from './RunLocally';
 
 export interface TopBarProps {
   templates: TemplateInfo[];
@@ -32,6 +33,8 @@ export function TopBar({ templates, templateId, onTemplate, modified, onReset, o
       </div>
       <div className="spacer" />
       {toast && <span className="toast" role="status">{toast}</span>}
+      <GitHubLink />
+      <RunLocally />
       <button type="button" className="btn ghost" onClick={onReset} disabled={!modified} title="Back to the template as shipped">Reset</button>
       <button type="button" className="btn primary" onClick={onCopy} title="Copy the file as plain, dependency-free R3F">Copy .tsx</button>
     </header>

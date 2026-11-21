@@ -447,6 +447,12 @@ export function createDaemon(opts: DaemonOptions): Daemon {
       if (path.extname(rel)) return json(res, 404, { error: 'not found' });
       file = path.join(dir, 'index.html'); // SPA fallback
     }
+    if (path.basename(file) === 'index.html') {
+      const html = (await fs.readFile(file, 'utf8')).replace('<head>', '<head>\n    <meta name="prismbox-local" content="1" />');
+      res.writeHead(200, { 'content-type': MIME['.html'] as string, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'access-control-allow-origin': '*' });
+      res.end(html);
+      return;
+    }
     res.writeHead(200, {
       'content-type': MIME[path.extname(file)] ?? 'application/octet-stream',
       'cache-control': 'no-store',

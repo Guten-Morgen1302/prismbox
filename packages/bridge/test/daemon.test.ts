@@ -348,3 +348,28 @@ describe('watcher: external edits reach Studio live', () => {
     expect((f.file as { source: string }).source).toContain('scale={4}');
   });
 });
+
+describe('serving Studio', () => {
+  it('marks index.html as local (so Studio never probes an endpoint) and serves assets with CORS; unknown assets are 404', async () => {
+    const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'prism-studio-'));
+    mkdirSync(path.join(dir, 'assets'));
+    writeFileSync(path.join(dir, 'index.html'), '<!doctype html><html><head><title>x</title></head><body></body></html>');
+    writeFileSync(path.join(dir, 'assets', 'a.js'), 'export {}');
+    r = await rig(fixture(), { studioDir: dir });
+    try {
+      const idx = await r.httpGet('/');
+      expect(idx.status).toBe(200);
+      expect(idx.body).toContain('<meta name="prismbox-local" content="1" />');
+      expect((await r.httpGet('/some/deep/link')).body).toContain('prismbox-local'); // SPA fallback is marked too
+      const a = await r.httpGet('/assets/a.js', { Origin: 'null' });
+      expect(a.status).toBe(200);
+      expect((await r.httpGet('/assets/missing.js')).status).toBe(404);
+      expect((await r.httpGet('/../package.json')).status).not.toBe(200);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
