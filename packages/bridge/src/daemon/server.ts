@@ -237,7 +237,22 @@ export function createDaemon(opts: DaemonOptions): Daemon {
       const node = findNodeByTag(readScene(snap.source, snap.path), m.tag);
       if (!node) return reject(c, m.id, 'NODE_NOT_FOUND', `No node at ${m.tag}; the file changed since the page loaded.`);
       if (node.kind !== 'host') return reject(c, m.id, 'READ_ONLY_NODE', 'Only scene elements can be edited from the page.');
-      const ops: Op[] = (Object.entries(m.changes) as [string, { from: number[]; to: number[] }][]).map(([prop, ch]) => ({ op: 'setProp', node: node.id, prop, value: ch.to, expected: ch.from }));
+      const DEFAULTS: Record<string, number[]> = { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] };
+      const same = (a: number[], b: number[]) => a.length === b.length && a.every((v, i) => Math.abs(v - (b[i] as number)) < 1e-3);
+      const ops: Op[] = [];
+      for (const [prop, ch] of Object.entries(m.changes) as [string, { from: number[]; to: number[] }][]) {
+        const info = node.props.find((p) => p.name === prop);
+        // The page reports the object's real transform. A prop that is absent in the source means the default, so the
+        // page's "from" must equal that default (and there is nothing to compare against). A scalar `scale={2}` reads as [2, 2, 2].
+        if (!info) {
+          if (!same(ch.from, DEFAULTS[prop] as number[])) return reject(c, m.id, 'CONFLICT', `"${prop}" is not set in the file, but the page believes it is ${JSON.stringify(ch.from)}; reload the page.`);
+          ops.push({ op: 'setProp', node: node.id, prop, value: ch.to });
+          continue;
+        }
+        const cur = info.value;
+        const expected = typeof cur === 'number' && ch.from.every((v) => Math.abs(v - cur) < 1e-3) ? cur : ch.from;
+        ops.push({ op: 'setProp', node: node.id, prop, value: ch.to, expected });
+      }
       const r = await project.edit(snap.path, ops, { baseHash: snap.hash, author: 'page', summary: Object.keys(m.changes).join(' + ') });
       accepted++;
       send(c, { type: 'proposal-result', id: m.id, ok: true });

@@ -186,6 +186,40 @@ describe('d8: page proposals are accepted only while armed', () => {
   });
 });
 
+describe('page proposals on props that are absent or scalar in the source', () => {
+  const armed = async () => {
+    r = await rig();
+    const studio = await r.studio();
+    await ready(studio);
+    const page = await r.page();
+    studio.send({ type: 'arm', value: true });
+    await page.waitFor((m) => m.type === 'arm');
+    return page;
+  };
+
+  it('moving a <group> with no position prop inserts it (default [0, 0, 0] is the expected old value)', async () => {
+    const page = await armed();
+    page.send({ type: 'proposal', id: 1, tag: at('<group name="rig"'), changes: { position: { from: [0, 0, 0], to: [1, 2, 3] } } });
+    expect(await page.waitFor((m) => m.type === 'proposal-result')).toMatchObject({ ok: true });
+    expect(read(r!.fx.abs).toString()).toContain('<group name="rig" position={[1, 2, 3]}');
+  });
+
+  it('still refuses when the page claims a non-default old value for an absent prop', async () => {
+    const page = await armed();
+    const before = read(r!.fx.abs);
+    page.send({ type: 'proposal', id: 2, tag: at('<group name="rig"'), changes: { rotation: { from: [0, 1, 0], to: [0, 2, 0] } } });
+    expect(await page.waitFor((m) => m.type === 'proposal-result')).toMatchObject({ ok: false, code: 'CONFLICT' });
+    expect(read(r!.fx.abs).equals(before)).toBe(true);
+  });
+
+  it('a scalar scale={1} is compared as [1, 1, 1] and written as a tuple', async () => {
+    const page = await armed();
+    page.send({ type: 'proposal', id: 3, tag: KNOT_TAG, changes: { scale: { from: [1, 1, 1], to: [2, 2, 2] } } });
+    expect(await page.waitFor((m) => m.type === 'proposal-result')).toMatchObject({ ok: true });
+    expect(read(r!.fx.abs).toString()).toContain('scale={[2, 2, 2]}');
+  });
+});
+
 describe('compare-and-set', () => {
   it('Studio edits with a stale baseHash are refused with CONFLICT, the file is untouched and Studio gets the current file', async () => {
     r = await rig();
