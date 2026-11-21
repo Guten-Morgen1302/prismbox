@@ -1,0 +1,12 @@
+{
+  // Cloudflare Workers static assets: serves the built Playground (apps/studio/dist).
+  // Cloudflare build settings: build command `pnpm install --frozen-lockfile && pnpm --filter @prismbox/studio build`,
+  // deploy command `npx wrangler deploy` (this file is what it reads). Headers come from apps/studio/public/_headers.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "prismbox-playground",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./apps/studio/dist",
+    "not_found_handling": "single-page-application"
+  }
+}

@@ -7,12 +7,16 @@ The Playground is `apps/studio` built as static files. Two things matter on any 
 
 Both configs below do this and add a strict CSP for the Studio page (`frame-ancestors 'none'`) while letting `sandbox.html` be framed by Studio only. `sandbox.html` also carries its own CSP in a `<meta>` tag with `connect-src 'none'`, so scene code cannot make network requests.
 
-## Cloudflare Pages
+## Cloudflare (Workers static assets)
+
+New Cloudflare projects are created through **Workers & Pages → Create → Import a repository**, which runs a build command and then a deploy command. The repository root has a `wrangler.jsonc` that points the deploy at the built Playground, so the default deploy command works:
 
 - Build command: `pnpm install --frozen-lockfile && pnpm --filter @prismbox/studio build`
-- Build output directory: `apps/studio/dist`
-- Root directory: the repository root (the Studio build reads `packages/core` and `packages/templates`).
+- Deploy command: `npx wrangler deploy` (reads `wrangler.jsonc`: assets from `apps/studio/dist`, SPA fallback)
+- Root directory: the repository root.
 - Headers come from `apps/studio/public/_headers` (copied into `dist/`).
+
+Without `wrangler.jsonc`, `wrangler deploy` fails in a monorepo with "The Cloudflare application detection logic has been run in the root of a workspace". The site is served at `https://prismbox-playground.<your-subdomain>.workers.dev`; rename it in `wrangler.jsonc` (`name`) or add a custom domain in the dashboard. Classic **Pages** projects also work: build output directory `apps/studio/dist`, no deploy command.
 
 ## Vercel
 
