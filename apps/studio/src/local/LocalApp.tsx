@@ -93,6 +93,11 @@ export function LocalApp() {
           </select>
         </div>
         <div className="spacer" />
+        {selected && file && (
+          <span className="agent-sel" data-testid="agent-selection" title="This is what an AI agent means by &quot;this&quot; when it calls prism_get_selection">
+            <i /> Selected for agent · {file.path.split('/').pop()}:{selected.line}
+          </span>
+        )}
         <span className={`conn ${s.conn}`} data-testid="conn">
           <i /> {s.conn === 'connected' ? (s.page ? 'page connected' : 'waiting for your page') : s.conn === 'connecting' ? 'connecting' : 'daemon disconnected'}
         </span>
@@ -145,7 +150,7 @@ export function LocalApp() {
         </div>
       </main>
 
-      <Inspector node={selected} edit={selectedEntry?.edit ?? null} file={file?.path ?? ''} onLive={live} onCommit={commit} />
+      <Inspector node={selected} edit={selectedEntry?.edit ?? null} file={file?.path ?? ''} agentSelected={s.conn === 'connected'} onLive={live} onCommit={commit} />
 
       <DiffStrip
         log={s.log.map((e) => ({ ...e }))}

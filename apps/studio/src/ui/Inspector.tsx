@@ -7,6 +7,8 @@ export interface InspectorProps {
   node: SceneNode | null;
   edit: 'editable' | 'partial' | 'read-only' | null;
   file: string;
+  /** Local mode: this selection is also what the connected AI agent sees. */
+  agentSelected?: boolean;
   /** Live (uncommitted) preview of a value inside the sandbox. */
   onLive: (tag: string, target: Target, value: PropValue) => void;
   /** Commit one edit to the source. */
@@ -111,7 +113,7 @@ function FieldRow({ node, file, field, onLive, onCommit }: { node: SceneNode; fi
 
 const EDIT_LABEL = { editable: 'Editable', partial: 'Partly editable', 'read-only': 'Read-only' } as const;
 
-export function Inspector({ node, edit, file, onLive, onCommit }: InspectorProps) {
+export function Inspector({ node, edit, file, agentSelected, onLive, onCommit }: InspectorProps) {
   if (!node) {
     return (
       <aside className="panel inspector">
@@ -136,6 +138,7 @@ export function Inspector({ node, edit, file, onLive, onCommit }: InspectorProps
           <div className="node-meta">
             <code>{file}:{node.line}</code>
             {edit && <span className={`badge ${edit}`}>{EDIT_LABEL[edit]}</span>}
+            {agentSelected && <span className="badge agent" title="Visible to the AI agent via prism_get_selection">agent sees this</span>}
           </div>
           {node.reasons.length > 0 && edit !== 'editable' && <ul className="reasons">{node.reasons.map((r) => <li key={r}>{r}</li>)}</ul>}
         </div>

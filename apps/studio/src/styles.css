@@ -219,3 +219,10 @@ code, pre { font-family: var(--mono); font-size: 12px; }
 .author.page { color: var(--accent-text); border-color: rgba(124, 108, 255, 0.5); background: var(--accent-soft); }
 .author.external { color: var(--warn); border-color: rgba(227, 179, 75, 0.4); }
 .diff-row.external { background: rgba(227, 179, 75, 0.04); }
+
+/* ---------- agent (M3) ---------- */
+.author.agent { color: #7be0c4; border-color: rgba(123, 224, 196, 0.45); background: rgba(123, 224, 196, 0.1); }
+.diff-row.edit:has(.author.agent) { background: rgba(123, 224, 196, 0.04); }
+.agent-sel { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 11px; border-radius: 999px; border: 1px solid rgba(123, 224, 196, 0.4); background: rgba(123, 224, 196, 0.08); color: #7be0c4; font-size: 12px; font-weight: 550; white-space: nowrap; }
+.agent-sel i { width: 7px; height: 7px; border-radius: 50%; background: #7be0c4; }
+.badge.agent { color: #7be0c4; border-color: rgba(123, 224, 196, 0.4); }
