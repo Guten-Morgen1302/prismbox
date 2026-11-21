@@ -55,6 +55,29 @@ The plugin is `apply: 'serve'` and `enforce: 'pre'`, adds `resolve.dedupe` for r
 
 **Studio.** Same app as the Playground. When it is served by the daemon (it answers `/__prism/session`) it runs in Local mode: the file list, scene tree and inspector are driven by the real file on disk, edits go to the daemon, and the header has the **Arm** toggle. Diff rows are tagged `you`, `page` or `external`.
 
+## Agent bridge (M3)
+
+`prismbox mcp [--root <dir>]` is an MCP server on stdio (`@modelcontextprotocol/sdk`). **stdout carries only MCP JSON-RPC frames**; `console.log/info/debug` are rerouted to stderr and the startup note goes to stderr (a test spawns the real CLI and checks stdout byte for byte).
+
+**Discovery.** The daemon writes `~/.prismbox/sessions/<sha256(root)>.json` (`port`, `token`, `pid`, `root`, `startedAt`; mode 0600 on POSIX; `$PRISMBOX_HOME` overrides the home) **outside the project**, removes it on exit, and readers prune any descriptor whose pid is dead. Nothing is ever written inside your repo.
+
+**Auth.** The MCP server calls the daemon's loopback API (`/__prism/api/*`) with `Authorization: Bearer <session token>` from that file. The token is Studio's write token and is never sent to a web page; the API refuses any request without it and any request carrying an `Origin` header (a browser). Agent edits do not need Studio to be armed, but they go through the same path as everything else: the daemon's own parse, compare-and-set, atomic write, and the undo stack. They show up in Studio tagged `agent`.
+
+**Selection.** The daemon tracks the selected node from both the real-page overlay click and Studio's tree, and describes it on demand from a fresh read of the file (file, line:col, tag, name, props, uniforms with `@prism` annotations, a numbered source snippet). If the file changed so the tag no longer resolves, the answer says so instead of guessing.
+
+**Capture.** `prism_get_view` asks a connected page to render synchronously and read the canvas in the same task (no `preserveDrawingBuffer`), gizmo and selection box hidden, downscaled to at most 1280 px, and returns PNG plus camera and viewport. It works whether or not Studio is armed; with no page it returns `NO_PAGE`, and a page that never answers gives `CAPTURE_FAILED` after a timeout.
+
+| Surface | What |
+|---|---|
+| Resource `prismbox://guide` | the authoring guide (`GUIDE` in `@prismbox/core`) |
+| `prism_get_selection` | the node the user selected: "this" |
+| `prism_get_view` | PNG image block + camera/viewport |
+| `prism_get_scene` | scene tree, edit states, props, uniforms, diagnostics (works offline from disk) |
+| `prism_set_prop`, `prism_set_uniform` | validated one-line edits; omit `node` to edit the selection; `expected` for compare-and-set; returns a unified diff |
+| `prism_lint` | subset + style-guide findings with fixes and coverage (works offline) |
+
+Errors are agent-ready: `isError`, a stable `code`, what happened and the fix. With no daemon, the daemon-backed tools return `DAEMON_OFFLINE` with the command to start it; lint, scene and the guide keep working.
+
 ## Animation pause (d9)
 
 While a gizmo handle is hovered **or** dragged, the overlay pauses animation by freezing the R3F clock: `clock.getDelta()` returns 0 and keeps `oldTime` fresh, so `useFrame` callbacks keep running with `delta = 0` and a frozen `elapsedTime`, and animation resumes exactly where it stopped. R3F's own `setFrameloop` is not used because it resets `clock.elapsedTime` to 0, which makes absolute-time animation jump. Code that reads time itself (`performance.now()`, GSAP, CSS) is not paused. This relies on R3F's loop calling `clock.getDelta()`; `apps/studio/test/clock.test.ts` reads the installed R3F source and fails if that stops being true, and the overlay warns at runtime if a frozen frame reports a non-zero delta.
@@ -85,7 +108,7 @@ See [SECURITY.md](../SECURITY.md).
 | Path | Purpose | State |
 |---|---|---|
 | `packages/core` | `@prismbox/core`: parser, subset classifier, writer, `instrument()`, `outline()` | implemented (reader, `setProp`, `setUniform`, per-key uniforms) |
-| `packages/bridge` | `prismbox` CLI, daemon, Vite plugin and page overlay; later the MCP server | implemented (M2) |
+| `packages/bridge` | `prismbox` CLI, daemon, Vite plugin, page overlay and the MCP server | implemented (M2, M3) |
 | `apps/studio` | Studio control panel and the browser Playground (memory FS, sandboxed preview) | implemented for the Playground; not deployed |
 | `packages/templates`, `packages/shaders` | six hero templates and the GLSL blocks they are built from | implemented |
 | `packages/behaviors` | copy-in behavior wrappers | planned |
@@ -98,7 +121,7 @@ See [SECURITY.md](../SECURITY.md).
 - **M0:** repository standards, CI, `@prismbox/core` reader and writer, CLI skeleton.
 - **M1:** `instrument()`, per-key uniforms, six hero templates, Studio on the memory file system (Playground, not deployed). Still to do: `unsetProp`, behaviors package, templates 7 to 10.
 - **M2 (in progress):** the Vite real-page plugin, daemon, overlay with gizmo, Local-mode Studio, live disk write-back with undo. Gate: end-to-end on `examples/vite-hero`. Still to do: `setCamera`.
-- **M3:** MCP server and agent style guide, point-at selection, Next harness fallback.
+- **M3 (in progress):** MCP server, agent guide and point-at selection. Next harness fallback is not in this milestone.
 - **M4:** polish, demo, public launch.
 
 The Step 0b spike showed that a dev-time plugin can inject the overlay into a real Vite page and support pick-to-source and gizmo drag; M2 builds that for real.
