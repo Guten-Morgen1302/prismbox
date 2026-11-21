@@ -1,95 +1,123 @@
 # Prismbox
 
-**An agent-native visual editor for React Three Fiber.** Your AI agent writes the `.tsx`. You nudge the scene visually. The change lands as a minimal diff in the same file, and the agent can see what you are pointing at.
+**Edit React Three Fiber on your real page. Each change is one line in your `.tsx`, and your coding agent can point at what you select.**
 
-> **Status: active v1 development (milestone M2). Early.** You can run `prismbox` in a Vite + React 19 + R3F 9 project, drag objects on your real page, and watch each drag land as one line in your `.tsx`. There is no hosted Playground yet, and the API will change.
+[**Live Browser Playground**](#try-it-in-the-browser) · [Quickstart](#quickstart) · [MCP setup](#connect-your-coding-agent) · [Security](#security-model) · [Contributing](CONTRIBUTING.md)
 
-## The idea
+<!-- DEMO_VIDEO_URL -->
 
-Claude Code and Codex already write good React Three Fiber code, but you cannot *steer* it visually: "move the orb a bit left and make the glass less frosty" is slow and lossy in prose. Visual editors tend to own the scene and turn your code into a build artifact.
+Prismbox is a visual editor for [React Three Fiber](https://r3f.docs.pmnd.rs) that treats your source file as the single source of truth. You run it next to your own Vite dev server, drag an object on your actual landing page, and the edit lands in the file as a text diff, not a regenerated file. An MCP server lets Claude Code, Cursor, Windsurf or Codex see what you have selected and edit it the same way.
 
-Prismbox is the missing loop:
+You commit plain React Three Fiber. Prismbox is not a dependency of your project and adds nothing to your production bundle.
 
-1. The agent writes plain R3F in a `.tsx` file.
-2. You drag, scrub and pick in a visual editor.
-3. Each edit is a **minimal text diff** to that same file. No reprinting, no reformatting.
-4. The agent can ask what you have selected ("make *this one* glassier") through MCP.
-5. You commit plain R3F. Prismbox is never a runtime dependency; delete it and your app runs unchanged.
+## Quickstart
 
-Round-tripping is only trustworthy on a declared subset of R3F, so Prismbox is strict about it: anything outside the subset is shown read-only and is **never rewritten**.
+In a Vite + React 19 + React Three Fiber 9 project:
 
-## What exists today
+```bash
+npx prismbox
+```
 
-| Piece | State |
+It starts a local daemon, runs **your** Vite dev server with a dev-only plugin attached, and prints two URLs: your page and Studio. Open both, click **Arm** in Studio, then click and drag objects on your real page. Nothing in your project is modified: your `vite.config`, `package.json` and imports stay as they are. Studio starts **disarmed**, and while disarmed your page behaves exactly as it does in production.
+
+## Try it in the browser
+
+<!-- PLAYGROUND_URL -->
+
+The Playground is Studio on an in-memory file system: six hero templates, edited in the browser, with **Copy .tsx** to take the result with you. It edits templates, not your repo. The hosted copy is not live yet; run it locally with `pnpm --filter @prismbox/studio dev` (see [Develop](#develop)).
+
+## Connect your coding agent
+
+```bash
+# Claude Code
+claude mcp add prismbox -- npx -y prismbox mcp --root /path/to/your/project
+
+# prints these for your platform (including Cursor and Windsurf JSON); writes nothing
+npx prismbox mcp --print-config --root .
+```
+
+Cursor (`.cursor/mcp.json`) or Windsurf (`~/.codeium/windsurf/mcp_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "prismbox": { "command": "npx", "args": ["-y", "prismbox", "mcp", "--root", "/path/to/your/project"] }
+  }
+}
+```
+
+On Windows, MCP clients start servers without a shell: use `"command": "cmd", "args": ["/c", "npx", "-y", ...]`. `--print-config` does this for you.
+
+Run `npx prismbox` in the project, open your page, click an object, and tell the agent to make *this* glassier. It calls `prism_get_selection`, looks with `prism_get_view`, and edits with `prism_set_prop` or `prism_set_uniform`. Every agent edit appears in Studio tagged `agent`, with one-click undo.
+
+| Tool | What it does |
 |---|---|
-| `@prismbox/core`: parse R3F files, classify nodes and props, write one prop as a single-span edit | working, tested |
-| `prismbox` CLI: `--version`, `--help` | working |
-| Six hero templates (`packages/templates`), built from shared GLSL blocks (`packages/shaders`) | working |
-| Studio Playground: scene tree, inspector, gizmo, live diff strip, Copy `.tsx` (runs locally, not deployed) | working |
-| `prismbox` Local mode for Vite projects: daemon, real-page overlay, armed Studio, live disk write-back with undo and compare-and-set | working (`pnpm demo`) |
-| `prismbox mcp`: MCP server (selection, live canvas capture, scene, minimal-diff edits, lint, authoring guide) | working |
-| Next.js | planned |
+| `prism_get_selection` | The node you selected: file, line, props, shader uniforms, surrounding source |
+| `prism_get_view` | A PNG of the live canvas (gizmo hidden) plus camera and viewport |
+| `prism_get_scene` | The scene tree with edit state per node |
+| `prism_set_prop`, `prism_set_uniform` | Validated one-line edits, compare-and-set, returns a diff |
+| `prism_lint` | Subset and style findings with fixes. Works without the daemon |
+| `prismbox://guide` (resource) | How to write R3F that Prismbox can edit |
 
-See [docs/architecture.md](docs/architecture.md) for the design and [docs/subset.md](docs/subset.md) for exactly what is editable.
+## What it does
 
-## Try it on a real page
+**Real-page visual editing.** The overlay runs inside your page's own `<Canvas>`: pick, drag a transform gizmo, scrub a shader uniform. The daemon turns each gesture into one minimal text edit with `magic-string`. Your formatting, comments and line endings are untouched, writes are atomic, and undo restores the exact original bytes. If the file changed on disk since you last looked (an editor, a coding agent), the write is refused instead of clobbering it.
 
-```bash
-pnpm install && pnpm build
-pnpm demo     # prismbox on examples/vite-hero
-```
+**Agent point-and-edit.** "This" means whatever you have selected. The agent gets the file, line, props and a live screenshot, and its edits go through the same parser and compare-and-set writer as yours.
 
-Open the two URLs it prints: your page and Studio. Click **Arm**, then drag the 3D knot on the real page. See [examples/vite-hero](examples/vite-hero).
+**No lock-in.** `vite build` on your project produces a bundle with zero Prismbox bytes, and a test asserts it: the plugin only exists in the dev server Prismbox starts, and `// @prism` shader annotations are ordinary GLSL comments.
 
-## Try the Playground locally
+## How it compares
 
-```bash
-pnpm install
-pnpm --filter @prismbox/studio dev
-```
+There are several ways to edit 3D on the web, and the others are good. This is our understanding of each at the time of writing; check their docs for the current state.
 
-Open <http://127.0.0.1:4173/>. Pick a template, click an object, drag a gizmo handle or use the inspector, and watch the exact one-line patch land in the diff strip. **Copy .tsx** gives you plain React Three Fiber with no Prismbox in it. Design notes: [DESIGN.md](DESIGN.md).
+| | Prismbox | [Triplex](https://triplex.dev) | [Spline](https://spline.design) |
+|---|---|---|---|
+| Source of truth | Your `.tsx` | Your `.tsx` | A Spline scene, exported to code |
+| Where you edit | Your real running page | A dedicated editor | The Spline app |
+| How edits land | Minimal text diffs to your file | Edits to your file | In the scene, then export |
+| Agent integration | MCP server: selection, screenshot, edits | Check their docs | Check their docs |
+| Scope | R3F scenes in Vite projects | R3F components, broader editor | Full 3D design: modeling, materials, interaction |
+| License | MIT, runs locally | See their repo | Commercial, free tier |
 
-## Try the core
+Pick Spline if you want a design tool and are fine with exported code. Pick Triplex if you want a full-featured editor for your R3F components. Pick Prismbox if you want to nudge a scene an agent wrote, on the real page, and keep the diff reviewable.
 
-```ts
-import { readScene, setProp } from '@prismbox/core';
+## Limitations
 
-const scene = readScene(source);
-// scene.nodes, scene.diagnostics, scene.summary.coverage
+- **Vite only for now.** Next.js is on the roadmap; it needs a launch path that does not ask you to change your config.
+- **A declared subset.** Round-tripping is only trustworthy on literal props. An expression such as `position={[x, y * 2, 0]}` is shown read-only and never rewritten; so is anything inside `.map()` or a conditional. See [docs/subset.md](docs/subset.md). In our first measurement, agent-written hero scenes were about 97% editable with the style guide and about 72% without (10 files: a regression signal, not a benchmark).
+- **Animation pauses while you edit.** While a gizmo handle is hovered or dragged, the R3F clock is frozen. Animation driven by `performance.now()` or `Date.now()` is not paused.
+- **Pointer handlers on the 3D scene are paused while armed.** Ordinary page controls keep working.
+- **Early software.** It is 0.1: expect rough edges, and the API will change.
 
-const result = setProp(source, {
-  op: 'setProp',
-  node: 'orb',            // the node's `name` prop, or a path id from the scene
-  prop: 'position',
-  value: [0.4, 0.1, 0],
-});
-result.source; // the file with exactly one span changed
-result.hunk;   // { line, before, after } for a diff view
-```
+## Security model
 
-`@prismbox/core` is not published to npm yet; run it from a clone (below).
+Prismbox is a local tool: no accounts, no cloud, no telemetry. The daemon binds to `127.0.0.1` only and checks the `Host` and `Origin` headers.
+
+- **Armed gate (`d8`).** The page is untrusted. A drag on the page is a *proposal* that the daemon accepts only while you have armed Studio, rate-limited and bounded, and re-validated against the daemon's own parse of the current file. Disarmed, forged, stale or malformed proposals are rejected and the file is untouched.
+- **Write confinement.** Only `.tsx .ts .jsx .js` files under the project root; never dotfiles, `.env*` or `node_modules`; symlinks that escape the root are refused.
+- **Session token.** Studio's write token never reaches your page. The MCP server reads it from `~/.prismbox/sessions/`, outside your project, mode 0600 on POSIX.
+- **Scene code cannot write files.** In the Playground, templates run in a sandboxed iframe with an opaque origin and no network access.
+
+Details and known limits: [SECURITY.md](SECURITY.md) and [docs/architecture.md](docs/architecture.md). Please report vulnerabilities privately.
 
 ## Develop
 
-Requires Node.js 22.12+ and pnpm 10.
-
 ```bash
 git clone https://github.com/Guten-Morgen1302/prismbox.git
-cd prismbox
-pnpm install
-pnpm typecheck && pnpm lint && pnpm test && pnpm build
+cd prismbox && pnpm install && pnpm build
+pnpm demo                          # prismbox on examples/vite-hero (a plain landing page with no Prismbox in it)
+pnpm --filter @prismbox/studio dev # the Playground at http://127.0.0.1:4173
+pnpm test                          # unit and integration
+pnpm e2e                           # real browser, real daemon, real MCP client (needs Chromium)
+node scripts/pack-smoke.mjs        # packs the tarballs and runs them outside this repo, like npx would
 ```
 
-The write path is held to three invariants, enforced by the test suite on real agent-written files (see [fixtures/subset/step0](fixtures/subset/step0)):
-
-- a no-op leaves the file byte-identical,
-- one primitive edit changes exactly one span,
-- a file or node outside the subset is reported and never written.
+Packages: `@prismbox/core` (parser, writer, `instrument()`), `prismbox` (CLI, daemon, Vite plugin, overlay, MCP server, bundled Studio), `apps/studio` (Studio and the Playground), `packages/templates` (hero templates), `packages/shaders` (GLSL blocks). Deploying the Playground: [docs/deploy-playground.md](docs/deploy-playground.md).
 
 ## Contributing
 
-Bug reports and small focused PRs are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Security issues: [SECURITY.md](SECURITY.md).
+Bug reports with the smallest `.tsx` that reproduces them, and hero templates, are the most useful contributions. A template is one plain `.tsx` file with no Prismbox import; the rules and the authoring flow are in [docs/writing-a-template.md](docs/writing-a-template.md), and the PR checklist is in [CONTRIBUTING.md](CONTRIBUTING.md). Templates 7 to 10 are open.
 
 ## License
 
