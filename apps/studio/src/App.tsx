@@ -5,7 +5,7 @@ import { loadSaved, MemoryFs, save } from './fs';
 import type { Target } from './inspector-model';
 import { parseFromSandbox } from './protocol';
 import type { GizmoMode, ToSandbox, ViewMode } from './protocol';
-import { applyEdit, createSession, FILE_NAME, redo, reset, undo } from './session';
+import { applyEdit, createSession, FILE_NAME, redo, reset, sanitizePropValue, undo } from './session';
 import type { EditOp, Session } from './session';
 import { handleStudioKey } from './shortcuts';
 import { TEMPLATES } from './templates';
@@ -45,6 +45,7 @@ export function App() {
   const [armed, setArmed] = useState(true);
   const [view, setView] = useState<ViewMode>('scene');
   const [gizmo, setGizmo] = useState<GizmoMode>('translate');
+  const [snap, setSnap] = useState(false);
   const [status, setStatus] = useState<'booting' | 'loading' | 'ready' | 'error'>('booting');
   const [sandboxError, setSandboxError] = useState<string | null>(null);
   const [frozen, setFrozen] = useState(false);
@@ -68,8 +69,8 @@ export function App() {
   }, []);
 
   // keep the latest values reachable from the (stable) message listener
-  const latest = useRef({ scene, selectedTag, session, selectedId });
-  latest.current = { scene, selectedTag, session, selectedId };
+  const latest = useRef({ scene, selectedTag, session, selectedId, snap });
+  latest.current = { scene, selectedTag, session, selectedId, snap };
 
   const commit = useCallback((op: EditOp) => setSession((s) => applyEdit(s, op)), []);
 
@@ -121,7 +122,8 @@ export function App() {
           const node = sc ? findNodeByTag(sc, m.tag) : undefined;
           if (!node) break;
           for (const [prop, change] of Object.entries(m.changes)) {
-            commit({ kind: 'prop', node: node.id, prop, value: change.to });
+            const value = latest.current.snap ? sanitizePropValue(change.to) : change.to;
+            commit({ kind: 'prop', node: node.id, prop, value });
           }
           break;
         }
@@ -161,6 +163,7 @@ export function App() {
   const onArm = useCallback((v: boolean) => { setArmed(v); post({ type: 'arm', value: v }); }, [post]);
   const onView = useCallback((v: ViewMode) => { setView(v); post({ type: 'view', mode: v }); }, [post]);
   const onGizmo = useCallback((g: GizmoMode) => { setGizmo(g); post({ type: 'gizmo', mode: g }); }, [post]);
+  const onSnap = useCallback((s: boolean) => { setSnap(s); post({ type: 'snap', enabled: s }); }, [post]);
   const onResetCamera = useCallback(() => { post({ type: 'resetCamera' }); }, [post]);
 
   const onTemplate = useCallback((id: string) => {
@@ -232,9 +235,11 @@ export function App() {
         armed={armed}
         view={view}
         gizmo={gizmo}
+        snap={snap}
         onArm={onArm}
         onView={onView}
         onGizmo={onGizmo}
+        onSnap={onSnap}
         onResetCamera={onResetCamera}
       />
       <Inspector node={selected} edit={selectedEntry?.edit ?? null} file={FILE_NAME} onLive={live} onCommit={edit} />
