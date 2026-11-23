@@ -30,3 +30,21 @@ export function computeFocusCamera(object: THREE.Object3D, camera: THREE.Camera)
   const position = center.clone().sub(dir.multiplyScalar(distance));
   return { position, target: center };
 }
+
+/**
+ * Restores camera position, rotation, and actual initial orbit target without hardcoding.
+ */
+export function resetCameraState(
+  camera: THREE.Camera,
+  initialPos: THREE.Vector3,
+  initialRot: THREE.Euler,
+  orbit?: { target: THREE.Vector3; update: () => void } | null,
+  initialOrbitTarget?: THREE.Vector3 | null,
+): void {
+  camera.position.copy(initialPos);
+  camera.rotation.copy(initialRot);
+  if (orbit && initialOrbitTarget) {
+    orbit.target.copy(initialOrbitTarget);
+    orbit.update();
+  }
+}

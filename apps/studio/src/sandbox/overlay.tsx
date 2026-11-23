@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import type { ToSandbox, TransformChange } from '../protocol';
 import { bus } from './bus';
-import { computeFocusCamera } from './camera';
+import { computeFocusCamera, resetCameraState } from './camera';
 import { ClockFreezer } from './clock';
 
 const ACCENT = '#7c6cff';
@@ -74,6 +74,7 @@ export function __PrismOverlay() {
     const sceneCam = get().camera;
     const initialCamPos = sceneCam.position.clone();
     const initialCamRot = sceneCam.rotation.clone();
+    let initialOrbitTarget: THREE.Vector3 | null = null;
     let freeCam: THREE.Camera | null = null;
     let orbit: OrbitControls | null = null;
 
@@ -181,6 +182,9 @@ export function __PrismOverlay() {
         freeCam = sceneCam.clone();
         orbit = new OrbitControls(freeCam, dom);
         orbit.enableDamping = false;
+        if (!initialOrbitTarget) {
+          initialOrbitTarget = orbit.target.clone();
+        }
         set({ camera: freeCam as THREE.PerspectiveCamera });
         tc.camera = freeCam;
       } else if (mode === 'scene' && freeCam) {
@@ -242,13 +246,9 @@ export function __PrismOverlay() {
           break;
         case 'resetCamera':
           if (bus.view === 'free' && freeCam && orbit) {
-            freeCam.position.copy(initialCamPos);
-            freeCam.rotation.copy(initialCamRot);
-            orbit.target.set(0, 0, 0);
-            orbit.update();
+            resetCameraState(freeCam, initialCamPos, initialCamRot, orbit, initialOrbitTarget);
           } else {
-            sceneCam.position.copy(initialCamPos);
-            sceneCam.rotation.copy(initialCamRot);
+            resetCameraState(sceneCam, initialCamPos, initialCamRot);
           }
           break;
         case 'focus':

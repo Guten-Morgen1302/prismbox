@@ -41,17 +41,16 @@ export function Viewport({ iframeRef, status, error, frozen, armed, view, gizmo,
       />
       <div className="vp-toolbar">
         <Segmented label="Mode" value={armed ? 'edit' : 'preview'} onChange={(v) => onArm(v === 'edit')} options={[{ id: 'edit', label: 'Edit', title: 'Pick and move objects. Your scene’s own pointer handlers are paused.' }, { id: 'preview', label: 'Preview', title: 'Run the scene as your visitors see it.' }]} />
-        <div className="segmented" role="group" aria-label="Camera">
-          <button type="button" title="The camera your file ships" className={view === 'scene' ? 'on' : ''} aria-pressed={view === 'scene'} onClick={() => onView('scene')}>
-            Scene cam
-          </button>
-          <button type="button" title="Orbit around without changing your file" className={view === 'free' ? 'on' : ''} aria-pressed={view === 'free'} onClick={() => onView('free')}>
-            Free view
-          </button>
-          <button type="button" title="Reset camera view" onClick={onResetCamera}>
-            Reset
-          </button>
-        </div>
+        <Segmented
+          label="Camera"
+          value={view}
+          onChange={(v) => (v === 'reset' ? onResetCamera() : onView(v))}
+          options={[
+            { id: 'scene', label: 'Scene cam', title: 'The camera your file ships' },
+            { id: 'free', label: 'Free view', title: 'Orbit around without changing your file' },
+            { id: 'reset', label: 'Reset', title: 'Reset camera view' },
+          ]}
+        />
         <Segmented label="Gizmo" value={gizmo} onChange={onGizmo} options={[{ id: 'translate', label: 'Move', title: 'Move (W)' }, { id: 'rotate', label: 'Rotate', title: 'Rotate (E)' }, { id: 'scale', label: 'Scale', title: 'Scale (R)' }]} />
       </div>
       {armed && frozen && <div className="chip paused">Paused while you edit</div>}

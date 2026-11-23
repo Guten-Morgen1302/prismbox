@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { computeFocusCamera, round3 } from '../src/sandbox/camera';
+import { computeFocusCamera, resetCameraState, round3 } from '../src/sandbox/camera';
 
 describe('camera framing math (Issue #4)', () => {
   it('computes center and distance to frame a mesh', () => {
@@ -43,5 +43,39 @@ describe('camera framing math (Issue #4)', () => {
     expect(mesh.position.x).toBe(1);
     expect(mesh.position.y).toBe(2);
     expect(mesh.position.z).toBe(3);
+  });
+
+  it('restores initial position, rotation, and actual initial orbit target (not hardcoded 0,0,0)', () => {
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+    const initialPos = new THREE.Vector3(10, 20, 30);
+    const initialRot = new THREE.Euler(0.1, 0.2, 0.3);
+    const initialOrbitTarget = new THREE.Vector3(5, 6, 7);
+
+    // Modify camera and orbit to arbitrary values
+    camera.position.set(-100, 50, 200);
+    camera.rotation.set(1, 1, 1);
+
+    let updated = false;
+    const orbit = {
+      target: new THREE.Vector3(99, 99, 99),
+      update: () => {
+        updated = true;
+      },
+    };
+
+    resetCameraState(camera, initialPos, initialRot, orbit, initialOrbitTarget);
+
+    expect(camera.position.x).toBe(10);
+    expect(camera.position.y).toBe(20);
+    expect(camera.position.z).toBe(30);
+    expect(round3(camera.rotation.x)).toBe(0.1);
+    expect(round3(camera.rotation.y)).toBe(0.2);
+    expect(round3(camera.rotation.z)).toBe(0.3);
+
+    // Orbit target must restore to actual initialOrbitTarget (5, 6, 7), NOT (0, 0, 0)
+    expect(orbit.target.x).toBe(5);
+    expect(orbit.target.y).toBe(6);
+    expect(orbit.target.z).toBe(7);
+    expect(updated).toBe(true);
   });
 });
