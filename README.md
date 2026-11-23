@@ -82,6 +82,24 @@ The Playground is Studio on an in-memory file system: pick one of the [seven tem
 
 Errors are agent-ready: `isError`, a stable `code`, what happened and the fix. Without the daemon, the tools that need it return `DAEMON_OFFLINE` with the command to start it.
 
+## Remote MCP endpoint
+
+The hosted Playground also exposes a **read-only** MCP server over Streamable HTTP, so an agent can browse the templates without installing anything:
+
+```
+https://prismbox.prismbox.workers.dev/mcp
+```
+
+```bash
+# remote, read-only: list_templates, get_template_code, get_prismbox_guide
+claude mcp add --transport http prismbox-templates https://prismbox.prismbox.workers.dev/mcp
+
+# local, edits your project (needs `npx prismbox` running): see "MCP tools" above
+claude mcp add prismbox -- npx -y prismbox mcp --root /path/to/your/project
+```
+
+The remote server is stateless: it has no sessions, no auth and no access to your files, and it only serves the public template sources and a short guide. Editing your own project always goes through the local `prismbox mcp`.
+
 ## Hero templates
 
 Seven templates ship in `packages/templates`. Each is **one plain `.tsx`** that you can copy into any R3F project: no Prismbox import, `// @prism` annotations that are ordinary GLSL comments, and every tunable uniform a slider in Studio.

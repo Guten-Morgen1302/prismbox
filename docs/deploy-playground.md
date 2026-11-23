@@ -18,6 +18,8 @@ New Cloudflare projects are created through **Workers & Pages → Create → Imp
 
 Without `wrangler.jsonc`, `wrangler deploy` fails in a monorepo with "The Cloudflare application detection logic has been run in the root of a workspace". The site is served at `https://prismbox-playground.<your-subdomain>.workers.dev`; rename it in `wrangler.jsonc` (`name`) or add a custom domain in the dashboard. Classic **Pages** projects also work: build output directory `apps/studio/dist`, no deploy command.
 
+`wrangler.jsonc` also has a small Worker (`apps/studio/worker`) that answers only `/mcp`, a stateless read-only MCP endpoint serving the template sources (they are bundled as text through `rules`). Every other path is served straight from the static assets, with headers from `_headers`. Static hosts without Workers (Pages, Vercel, Netlify) serve the Playground without `/mcp`.
+
 ## Vercel
 
 - Framework preset: Other. Root directory: `apps/studio`, with **Include source files outside of the Root Directory** enabled.

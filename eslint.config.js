@@ -8,6 +8,7 @@ export default tseslint.config(
       '**/dist/**',
       '**/coverage/**',
       '.gstack/**',
+      '**/.wrangler/**',
       // conformance fixtures are test data (real-world R3F files), not project source
       'fixtures/**',
     ],

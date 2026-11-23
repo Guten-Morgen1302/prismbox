@@ -23,3 +23,6 @@ tmp/
 *.log
 .DS_Store
 Thumbs.db
+
+# wrangler local state
+.wrangler/
