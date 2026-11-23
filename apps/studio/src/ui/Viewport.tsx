@@ -51,7 +51,7 @@ export function Viewport({ iframeRef, status, error, frozen, armed, view, gizmo,
             { id: 'reset', label: 'Reset', title: 'Reset camera view' },
           ]}
         />
-        <Segmented label="Gizmo" value={gizmo} onChange={onGizmo} options={[{ id: 'translate', label: 'Move', title: 'Move (W)' }, { id: 'rotate', label: 'Rotate', title: 'Rotate (E)' }, { id: 'scale', label: 'Scale', title: 'Scale (R)' }]} />
+        <Segmented label="Gizmo" value={gizmo} onChange={onGizmo} options={[{ id: 'translate', label: 'Move', title: 'Move (G)' }, { id: 'rotate', label: 'Rotate', title: 'Rotate (R)' }, { id: 'scale', label: 'Scale', title: 'Scale (S)' }]} />
       </div>
       {armed && frozen && <div className="chip paused">Paused while you edit</div>}
       {!armed && <div className="chip live">Preview: the scene is live</div>}
