@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDaemon } from './daemon/server';
 import type { Daemon } from './daemon/server';
-import { detect, loadUserVite } from './detect';
+import { compatWarnings, detect, loadUserVite } from './detect';
 import { prismboxPlugin } from './plugin';
 import { prismHome, removeSession, writeSession } from './session-file';
 
@@ -79,6 +79,7 @@ export async function launch(opts: LaunchOptions): Promise<Running> {
   opts.log(`  vite      ${project.versions.vite}   react ${project.versions.react}   r3f ${project.versions.fiber}   three ${project.versions.three ?? '?'}`);
   opts.log(`  your page ${pageUrl}`);
   opts.log(`  studio    ${studioUrl}`);
+  for (const w of compatWarnings(project.versions)) opts.log(`warning: ${w}`);
   opts.log('Studio opens disarmed. Arm it to edit from the page. Nothing in your project was changed to run this.');
   if (opts.open) {
     openBrowser(studioUrl);

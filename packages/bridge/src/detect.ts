@@ -4,6 +4,19 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type * as ViteModule from 'vite';
 
+/**
+ * Non-blocking compatibility notes. `three` older than r156 is below @react-three/fiber 9's peer range, so scenes may
+ * misbehave in ways unrelated to Prismbox; say so up front instead of leaving the user to debug it.
+ */
+export function compatWarnings(versions: { three: string | null }): string[] {
+  const out: string[] = [];
+  const m = /^(\d+)\.(\d+)/.exec(versions.three ?? '');
+  if (m && Number(m[1]) === 0 && Number(m[2]) < 156) {
+    out.push(`three ${versions.three} is older than r156, the minimum @react-three/fiber 9 supports. Prismbox will run, but upgrade three if the scene misbehaves.`);
+  }
+  return out;
+}
+
 export interface Project {
   root: string;
   viteConfig: string | null;

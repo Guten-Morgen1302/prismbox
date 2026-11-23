@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { detect, DetectError } from '../src/detect';
+import { compatWarnings, detect, DetectError } from '../src/detect';
 import { helpText, parseArgs, run, version } from '../src/run';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string; bin: Record<string, string> };
@@ -65,6 +65,14 @@ describe('prismbox CLI', () => {
   it('parses dev, root, port, entry and open flags', () => {
     expect(parseArgs(['dev', 'src/Hero.tsx', '--root', 'x', '--port', '5000', '--no-open'])).toMatchObject({ command: 'dev', entry: 'src/Hero.tsx', root: 'x', port: 5000, open: false });
     expect(parseArgs([])).toMatchObject({ command: 'dev', open: undefined });
+  });
+});
+
+describe('compatibility warnings', () => {
+  it('warns for three older than r156 and stays quiet otherwise', () => {
+    expect(compatWarnings({ three: '0.150.1' })[0]).toMatch(/older than r156/);
+    expect(compatWarnings({ three: '0.155.0' })).toHaveLength(1);
+    for (const v of ['0.156.0', '0.187.0', '1.0.0', null, 'weird']) expect(compatWarnings({ three: v })).toEqual([]);
   });
 });
 
