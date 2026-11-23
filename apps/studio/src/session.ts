@@ -62,6 +62,16 @@ function push(s: Session, kind: DiffEntry['kind'], summary: string, before: stri
   return { ...s, log: [entry, ...s.log].slice(0, LOG_LIMIT), nextId: s.nextId + 1 };
 }
 
+export const round3 = (n: number): number => Math.round(n * 1000) / 1000 || 0;
+
+export function sanitizePropValue(value: PropValue): PropValue {
+  if (typeof value === 'number') return round3(value);
+  if (Array.isArray(value)) {
+    return value.map((v) => (typeof v === 'number' ? round3(v) : v)) as PropValue;
+  }
+  return value;
+}
+
 /** Apply one edit through @prismbox/core. A refused edit leaves the source untouched and records the reason. */
 export function applyEdit(s: Session, op: EditOp, now: number = Date.now()): Session {
   try {

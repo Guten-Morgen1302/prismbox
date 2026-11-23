@@ -80,6 +80,13 @@ export function __PrismOverlay() {
 
     const tc = new TransformControls(sceneCam, dom); // registers its listeners first
     tc.size = 0.85;
+
+    function setSnap(enabled: boolean) {
+      tc.setTranslationSnap(enabled ? 0.1 : null);
+      tc.setRotationSnap(enabled ? THREE.MathUtils.degToRad(15) : null);
+      tc.setScaleSnap(enabled ? 0.1 : null);
+    }
+    setSnap(bus.snap);
     const helper = tc.getHelper();
     helper.userData.prismHelper = true;
     scene.add(helper);
@@ -264,6 +271,10 @@ export function __PrismOverlay() {
               curCam.lookAt(framing.target);
             }
           }
+          break;
+        case 'snap':
+          bus.snap = m.enabled;
+          setSnap(m.enabled);
           break;
         case 'live':
           live(m);

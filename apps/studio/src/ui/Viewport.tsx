@@ -9,10 +9,12 @@ export interface ViewportProps {
   armed: boolean;
   view: ViewMode;
   gizmo: GizmoMode;
+  snap: boolean;
   onArm: (v: boolean) => void;
   onView: (v: ViewMode) => void;
   onGizmo: (g: GizmoMode) => void;
   onResetCamera: () => void;
+  onSnap: (s: boolean) => void;
 }
 
 export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: { id: T; label: string; title?: string }[]; onChange: (v: T) => void; label: string }) {
@@ -27,7 +29,7 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
   );
 }
 
-export function Viewport({ iframeRef, status, error, frozen, armed, view, gizmo, onArm, onView, onGizmo, onResetCamera }: ViewportProps) {
+export function Viewport({ iframeRef, status, error, frozen, armed, view, gizmo, snap, onArm, onView, onGizmo, onSnap, onResetCamera }: ViewportProps) {
   return (
     <main className="viewport" aria-label="Preview">
       <iframe
@@ -52,6 +54,15 @@ export function Viewport({ iframeRef, status, error, frozen, armed, view, gizmo,
           ]}
         />
         <Segmented label="Gizmo" value={gizmo} onChange={onGizmo} options={[{ id: 'translate', label: 'Move', title: 'Move (G)' }, { id: 'rotate', label: 'Rotate', title: 'Rotate (R)' }, { id: 'scale', label: 'Scale', title: 'Scale (S)' }]} />
+        <button
+          type="button"
+          className={`vp-btn ${snap ? 'on' : ''}`}
+          aria-pressed={snap}
+          onClick={() => onSnap(!snap)}
+          title="Snap to grid (0.1 units, 15°, 0.1 scale)"
+        >
+          Snap
+        </button>
       </div>
       {armed && frozen && <div className="chip paused">Paused while you edit</div>}
       {!armed && <div className="chip live">Preview: the scene is live</div>}
