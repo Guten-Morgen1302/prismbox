@@ -7,6 +7,7 @@ import { parseFromSandbox } from './protocol';
 import type { GizmoMode, ToSandbox, ViewMode } from './protocol';
 import { applyEdit, createSession, FILE_NAME, redo, reset, undo } from './session';
 import type { EditOp, Session } from './session';
+import { handleStudioKey } from './shortcuts';
 import { TEMPLATES } from './templates';
 import { DiffStrip } from './ui/DiffStrip';
 import { Inspector } from './ui/Inspector';
@@ -192,18 +193,12 @@ export function App() {
   }, [flash]);
 
   handleKey.current = (e) => {
-    const k = e.key.toLowerCase();
-    if (e.mod && k === 'z') {
-      e.preventDefault();
-      setSession((s) => (e.shift ? redo(s) : undo(s)));
-    } else if (e.mod && k === 'y') {
-      e.preventDefault();
-      setSession((s) => redo(s));
-    } else if (!e.mod && ['w', 'e', 'r'].includes(k)) {
-      onGizmo(({ w: 'translate', e: 'rotate', r: 'scale' } as const)[k as 'w' | 'e' | 'r']);
-    } else if (!e.mod && k === 'f' && latest.current.selectedId) {
-      post({ type: 'focus' });
-    }
+    handleStudioKey(e, latest.current.selectedId, {
+      onGizmo,
+      onUndo: () => setSession((s) => undo(s)),
+      onRedo: () => setSession((s) => redo(s)),
+      onFocus: () => post({ type: 'focus' }),
+    });
   };
 
   useEffect(() => {
