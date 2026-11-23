@@ -23,7 +23,7 @@ jobs:
         # the dev toolchain (vitest, tsup) needs Node 22.12+; published packages run on Node 20+ (see smoke step)
         node: [22, 24]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v4
 
