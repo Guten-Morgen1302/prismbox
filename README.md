@@ -10,6 +10,8 @@
 [![Node >=20](https://img.shields.io/badge/node-%3E%3D20-3c873a?logo=node.js&logoColor=white)](package.json)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
+<a href="https://www.producthunt.com/products/prismbox-2?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-prismbox-2" target="_blank" rel="noopener noreferrer"><img alt="Prismbox - Edit your React Three Fiber scene live, by hand or by agent | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1327442&amp;theme=light&amp;t=1795428839296"></a>
+
 [**Live Playground**](https://prismbox.prismbox.workers.dev) · [Quickstart](#quickstart) · [MCP Tools](#mcp-tools) · [Templates](#hero-templates) · [Security](#security-model) · [Contributing](#contributing)
 
 </div>
