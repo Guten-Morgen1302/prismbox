@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import type { ToSandbox, TransformChange } from '../protocol';
 import { bus } from './bus';
+import { computeFocusCamera, resetCameraState } from './camera';
 import { ClockFreezer } from './clock';
 
 const ACCENT = '#7c6cff';
@@ -71,6 +72,9 @@ export function __PrismOverlay() {
   useEffect(() => {
     const dom = gl.domElement;
     const sceneCam = get().camera;
+    const initialCamPos = sceneCam.position.clone();
+    const initialCamRot = sceneCam.rotation.clone();
+    let initialOrbitTarget: THREE.Vector3 | null = null;
     let freeCam: THREE.Camera | null = null;
     let orbit: OrbitControls | null = null;
 
@@ -178,6 +182,9 @@ export function __PrismOverlay() {
         freeCam = sceneCam.clone();
         orbit = new OrbitControls(freeCam, dom);
         orbit.enableDamping = false;
+        if (!initialOrbitTarget) {
+          initialOrbitTarget = orbit.target.clone();
+        }
         set({ camera: freeCam as THREE.PerspectiveCamera });
         tc.camera = freeCam;
       } else if (mode === 'scene' && freeCam) {
@@ -236,6 +243,27 @@ export function __PrismOverlay() {
         case 'gizmo':
           bus.gizmo = m.mode;
           tc.setMode(m.mode);
+          break;
+        case 'resetCamera':
+          if (bus.view === 'free' && freeCam && orbit) {
+            resetCameraState(freeCam, initialCamPos, initialCamRot, orbit, initialOrbitTarget);
+          } else {
+            resetCameraState(sceneCam, initialCamPos, initialCamRot);
+          }
+          break;
+        case 'focus':
+          if (selected) {
+            const curCam = get().camera;
+            const framing = computeFocusCamera(selected, curCam);
+            if (bus.view === 'free' && freeCam && orbit) {
+              freeCam.position.copy(framing.position);
+              orbit.target.copy(framing.target);
+              orbit.update();
+            } else {
+              curCam.position.copy(framing.position);
+              curCam.lookAt(framing.target);
+            }
+          }
           break;
         case 'live':
           live(m);

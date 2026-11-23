@@ -12,6 +12,7 @@ export interface ViewportProps {
   onArm: (v: boolean) => void;
   onView: (v: ViewMode) => void;
   onGizmo: (g: GizmoMode) => void;
+  onResetCamera: () => void;
 }
 
 export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: { id: T; label: string; title?: string }[]; onChange: (v: T) => void; label: string }) {
@@ -26,7 +27,7 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
   );
 }
 
-export function Viewport({ iframeRef, status, error, frozen, armed, view, gizmo, onArm, onView, onGizmo }: ViewportProps) {
+export function Viewport({ iframeRef, status, error, frozen, armed, view, gizmo, onArm, onView, onGizmo, onResetCamera }: ViewportProps) {
   return (
     <main className="viewport" aria-label="Preview">
       <iframe
@@ -40,7 +41,16 @@ export function Viewport({ iframeRef, status, error, frozen, armed, view, gizmo,
       />
       <div className="vp-toolbar">
         <Segmented label="Mode" value={armed ? 'edit' : 'preview'} onChange={(v) => onArm(v === 'edit')} options={[{ id: 'edit', label: 'Edit', title: 'Pick and move objects. Your scene’s own pointer handlers are paused.' }, { id: 'preview', label: 'Preview', title: 'Run the scene as your visitors see it.' }]} />
-        <Segmented label="Camera" value={view} onChange={onView} options={[{ id: 'scene', label: 'Scene cam', title: 'The camera your file ships' }, { id: 'free', label: 'Free view', title: 'Orbit around without changing your file' }]} />
+        <Segmented
+          label="Camera"
+          value={view}
+          onChange={(v) => (v === 'reset' ? onResetCamera() : onView(v))}
+          options={[
+            { id: 'scene', label: 'Scene cam', title: 'The camera your file ships' },
+            { id: 'free', label: 'Free view', title: 'Orbit around without changing your file' },
+            { id: 'reset', label: 'Reset', title: 'Reset camera view' },
+          ]}
+        />
         <Segmented label="Gizmo" value={gizmo} onChange={onGizmo} options={[{ id: 'translate', label: 'Move', title: 'Move (W)' }, { id: 'rotate', label: 'Rotate', title: 'Rotate (E)' }, { id: 'scale', label: 'Scale', title: 'Scale (R)' }]} />
       </div>
       {armed && frozen && <div className="chip paused">Paused while you edit</div>}
