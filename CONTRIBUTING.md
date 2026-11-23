@@ -40,7 +40,7 @@ Open an issue with the smallest `.tsx` that reproduces it. Please only share cod
 
 ## Hero templates
 
-A template is a single plain `.tsx` inside the supported subset. The rules and the authoring flow are in [docs/writing-a-template.md](docs/writing-a-template.md). The first six ship in `packages/templates`; templates 7 to 10 are open for community PRs.
+A template is a single plain `.tsx` inside the supported subset. The rules and the authoring flow are in [docs/writing-a-template.md](docs/writing-a-template.md). The first seven ship in `packages/templates`; templates 8 to 10 are open for community PRs.
 
 ## Pull requests
 

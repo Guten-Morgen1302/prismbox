@@ -64,7 +64,7 @@ On Windows, MCP clients start servers without a shell: use `"command": "cmd", "a
 
 **[prismbox.prismbox.workers.dev](https://prismbox.prismbox.workers.dev)**
 
-The Playground is Studio on an in-memory file system: pick one of the [six templates](#hero-templates), drag, scrub, and copy the resulting `.tsx`. It edits templates, not your repo. To run it locally instead: `pnpm --filter @prismbox/studio dev` (see [Develop](#develop)).
+The Playground is Studio on an in-memory file system: pick one of the [seven templates](#hero-templates), drag, scrub, and copy the resulting `.tsx`. It edits templates, not your repo. To run it locally instead: `pnpm --filter @prismbox/studio dev` (see [Develop](#develop)).
 
 ## MCP tools
 
@@ -84,7 +84,7 @@ Errors are agent-ready: `isError`, a stable `code`, what happened and the fix. W
 
 ## Hero templates
 
-Six templates ship in `packages/templates`. Each is **one plain `.tsx`** that you can copy into any R3F project: no Prismbox import, `// @prism` annotations that are ordinary GLSL comments, and every tunable uniform a slider in Studio.
+Seven templates ship in `packages/templates`. Each is **one plain `.tsx`** that you can copy into any R3F project: no Prismbox import, `// @prism` annotations that are ordinary GLSL comments, and every tunable uniform a slider in Studio.
 
 | Template | Look | `@prism` uniforms |
 |---|---|---|
@@ -94,6 +94,7 @@ Six templates ship in `packages/templates`. Each is **one plain `.tsx`** that yo
 | `gradient-mesh` | A lit, rippling ribbon of colour | `uLight` `uSheen` |
 | `iridescent-knot` | Thin-film colour over a chrome torus knot | `uFilm` `uShift` `uChrome` |
 | `aurora-ribbon` | Three layered curtains of light over a starfield | `uIntensity` `uRays` |
+| `liquid-chrome-blob` | A slowly morphing mirror-metal blob reflecting a procedural photo studio | `uChrome` `uSheen` `uWobble` `uSpeed` |
 
 ## How it compares
 

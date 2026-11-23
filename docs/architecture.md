@@ -110,7 +110,7 @@ See [SECURITY.md](../SECURITY.md).
 | `packages/core` | `@prismbox/core`: parser, subset classifier, writer, `instrument()`, `outline()` | implemented (reader, `setProp`, `setUniform`, per-key uniforms) |
 | `packages/bridge` | `prismbox` CLI, daemon, Vite plugin, page overlay and the MCP server | implemented (M2, M3) |
 | `apps/studio` | Studio control panel and the browser Playground (memory FS, sandboxed preview) | implemented for the Playground; not deployed |
-| `packages/templates`, `packages/shaders` | six hero templates and the GLSL blocks they are built from | implemented |
+| `packages/templates`, `packages/shaders` | seven hero templates and the GLSL blocks they are built from | implemented |
 | `packages/behaviors` | copy-in behavior wrappers | planned |
 | `fixtures/subset` | conformance fixtures | Step 0 files |
 | `examples/vite-hero` | a plain landing page with a 3D hero; the end-to-end target and demo | implemented |
@@ -119,7 +119,7 @@ See [SECURITY.md](../SECURITY.md).
 ## Roadmap
 
 - **M0:** repository standards, CI, `@prismbox/core` reader and writer, CLI skeleton.
-- **M1:** `instrument()`, per-key uniforms, six hero templates, Studio on the memory file system (Playground, not deployed). Still to do: `unsetProp`, behaviors package, templates 7 to 10.
+- **M1:** `instrument()`, per-key uniforms, seven hero templates, Studio on the memory file system (Playground, not deployed). Still to do: `unsetProp`, behaviors package, templates 8 to 10.
 - **M2 (in progress):** the Vite real-page plugin, daemon, overlay with gizmo, Local-mode Studio, live disk write-back with undo. Gate: end-to-end on `examples/vite-hero`. Still to do: `setCamera`.
 - **M3 (in progress):** MCP server, agent guide and point-at selection. Next harness fallback is not in this milestone.
 - **M4:** polish, demo, public launch.

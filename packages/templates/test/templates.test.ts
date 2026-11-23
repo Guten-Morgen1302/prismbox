@@ -11,7 +11,7 @@ const read = (dir: string, id: string) => readFileSync(`${root}${dir}/${id}.tsx`
 
 describe('template kit', () => {
   it('manifest and files agree, six templates', () => {
-    expect(ids).toHaveLength(6);
+    expect(ids).toHaveLength(7);
     expect(readdirSync(`${root}templates`).map((f) => f.replace('.tsx', '')).sort()).toEqual([...ids].sort());
     expect(readdirSync(`${root}source`).map((f) => f.replace('.tsx', '')).sort()).toEqual([...ids].sort());
     for (const t of manifest.templates) expect(t.title && t.description && /^#[0-9a-f]{6}$/i.test(t.accent)).toBeTruthy();

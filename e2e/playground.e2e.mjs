@@ -1,5 +1,5 @@
 // The static Playground, as a public visitor sees it: the production build served by a tiny static host that applies
-// apps/studio/public/_headers (so the header file itself is under test), all six templates, zero console errors, and no
+// apps/studio/public/_headers (so the header file itself is under test), all seven templates, zero console errors, and no
 // local-mode clutter. Run: pnpm build && pnpm e2e
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
@@ -65,7 +65,7 @@ const server = http.createServer((req, res) => {
 await new Promise((r) => server.listen(4182, '127.0.0.1', r));
 const base = 'http://127.0.0.1:4182';
 
-const ids = ['liquid-glass-orb', 'glass-card', 'glowing-globe', 'gradient-mesh', 'iridescent-knot', 'aurora-ribbon'];
+const ids = ['liquid-glass-orb', 'glass-card', 'glowing-globe', 'gradient-mesh', 'iridescent-knot', 'aurora-ribbon', 'liquid-chrome-blob'];
 const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 try {
   // ---- headers as served ----
