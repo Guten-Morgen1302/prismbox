@@ -100,23 +100,32 @@ describe('project detection (read-only)', () => {
 
   it('explains why a folder is not supported, without touching it', async () => {
     const empty = tmp(null);
-    const next = tmp({ dependencies: { next: '15', '@react-three/fiber': '9' } });
+    const notVite = tmp({ dependencies: { express: '4', '@react-three/fiber': '9' } });
+    const pagesRouter = tmp({ dependencies: { next: '15', '@react-three/fiber': '9' } });
+    mkdirSync(path.join(pagesRouter, 'pages'));
     const noR3f = tmp({ devDependencies: { vite: '8' } });
     const react18 = tmp({ devDependencies: { vite: '8', react: '18', '@react-three/fiber': '9' } });
     fakeModules(react18, { vite: '8.0.0', react: '18.3.1', '@react-three/fiber': '9.0.0' });
-    const ok = tmp({ devDependencies: { vite: '8', react: '19', '@react-three/fiber': '9', three: '0.180' } });
-    fakeModules(ok, { vite: '8.1.0', react: '19.1.0', '@react-three/fiber': '9.2.0', three: '0.180.0' });
+    const okVite = tmp({ devDependencies: { vite: '8', react: '19', '@react-three/fiber': '9', three: '0.180' } });
+    fakeModules(okVite, { vite: '8.1.0', react: '19.1.0', '@react-three/fiber': '9.2.0', three: '0.180.0' });
+    const okNext = tmp({ dependencies: { next: '15', react: '19', '@react-three/fiber': '9' } });
+    mkdirSync(path.join(okNext, 'app'));
+    fakeModules(okNext, { next: '15.1.0', react: '19.1.0', '@react-three/fiber': '9.2.0' });
     try {
       expect(code(() => detect(empty))).toBe('NOT_A_PROJECT');
-      expect(code(() => detect(next))).toBe('NOT_VITE');
+      expect(code(() => detect(notVite))).toBe('NOT_VITE');
+      expect(code(() => detect(pagesRouter))).toBe('PAGES_ROUTER');
       expect(code(() => detect(noR3f))).toBe('NO_R3F');
       expect(code(() => detect(react18))).toBe('UNSUPPORTED_VERSION');
-      expect(detect(ok).versions).toEqual({ vite: '8.1.0', react: '19.1.0', three: '0.180.0', fiber: '9.2.0' });
-      const r = await exec(['--root', next, '--no-open']);
+      expect(detect(okVite).framework).toBe('vite');
+      expect(detect(okVite).versions).toEqual({ vite: '8.1.0', react: '19.1.0', three: '0.180.0', fiber: '9.2.0' });
+      expect(detect(okNext).framework).toBe('next');
+      expect(detect(okNext).versions).toEqual({ next: '15.1.0', react: '19.1.0', three: null, fiber: '9.2.0' });
+      const r = await exec(['--root', pagesRouter, '--no-open']);
       expect(r.code).toBe(1);
-      expect(r.err).toContain('Vite');
+      expect(r.err).toContain('Pages Router is not supported');
     } finally {
-      for (const d of [empty, next, noR3f, react18, ok]) rmSync(d, { recursive: true, force: true });
+      for (const d of [empty, notVite, pagesRouter, noR3f, react18, okVite, okNext]) rmSync(d, { recursive: true, force: true });
     }
   });
 });

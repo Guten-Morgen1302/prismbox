@@ -17,15 +17,19 @@ export function compatWarnings(versions: { three: string | null }): string[] {
   return out;
 }
 
+export type Framework = 'vite' | 'next';
+
 export interface Project {
+  framework: Framework;
   root: string;
   viteConfig: string | null;
-  versions: { vite: string; react: string; three: string | null; fiber: string };
+  nextConfig: string | null;
+  versions: { vite?: string; next?: string; react: string; three: string | null; fiber: string };
 }
 
 export class DetectError extends Error {
   constructor(
-    readonly code: 'NOT_A_PROJECT' | 'NOT_VITE' | 'NO_R3F' | 'UNSUPPORTED_VERSION' | 'NOT_INSTALLED',
+    readonly code: 'NOT_A_PROJECT' | 'NOT_VITE' | 'PAGES_ROUTER' | 'NO_R3F' | 'UNSUPPORTED_VERSION' | 'NOT_INSTALLED',
     message: string,
   ) {
     super(message);
@@ -33,7 +37,8 @@ export class DetectError extends Error {
   }
 }
 
-const CONFIGS = ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs', 'vite.config.cjs', 'vite.config.cts'];
+const VITE_CONFIGS = ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs', 'vite.config.cjs', 'vite.config.cts'];
+const NEXT_CONFIGS = ['next.config.ts', 'next.config.mjs', 'next.config.js', 'next.config.cjs'];
 
 const major = (v: string): number => Number.parseInt(v.replace(/^[^\d]*/, ''), 10);
 
@@ -63,26 +68,44 @@ function installedVersion(req: NodeRequire, name: string): string | null {
   return null;
 }
 
-/** Recognise a Vite + React 19 + R3F 9 project. Reads only; never modifies anything in the project. */
+/** Recognise a Vite or Next.js App Router + React 19 + R3F 9 project. Reads only; never modifies anything in the project. */
 export function detect(rootArg: string): Project {
   const root = path.resolve(rootArg);
   const pkgPath = path.join(root, 'package.json');
   if (!existsSync(pkgPath)) throw new DetectError('NOT_A_PROJECT', `No package.json in ${root}. Run prismbox from your project folder, or pass --root <dir>.`);
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
   const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-  if (!deps.vite) throw new DetectError('NOT_VITE', 'This does not look like a Vite project (no "vite" in package.json). Prismbox supports Vite projects for now.');
+  if (!deps.vite && !deps.next) throw new DetectError('NOT_VITE', 'This does not look like a Vite or Next.js project (no "vite" or "next" in package.json). Prismbox supports Vite and Next.js App Router.');
   if (!deps['@react-three/fiber']) throw new DetectError('NO_R3F', 'No "@react-three/fiber" in package.json. Prismbox edits React Three Fiber scenes.');
+
+  const hasAppRouter = existsSync(path.join(root, 'app')) || existsSync(path.join(root, 'src', 'app'));
+  const isNext = Boolean(deps.next && (!deps.vite || hasAppRouter));
+
   const req = createRequire(pkgPath);
-  const vite = installedVersion(req, 'vite');
   const react = installedVersion(req, 'react');
   const fiber = installedVersion(req, '@react-three/fiber');
   const three = installedVersion(req, 'three');
+
+  if (isNext) {
+    if (!hasAppRouter) {
+      throw new DetectError('PAGES_ROUTER', 'Next.js Pages Router is not supported. Prismbox supports the Next.js App Router (app/ or src/app/).');
+    }
+    const next = installedVersion(req, 'next');
+    if (!next || !react || !fiber) throw new DetectError('NOT_INSTALLED', 'Dependencies are not installed. Run your package manager\'s install first.');
+    if (major(react) < 19) throw new DetectError('UNSUPPORTED_VERSION', `React ${react} is installed but Prismbox needs React 19 or newer.`);
+    if (major(fiber) < 9) throw new DetectError('UNSUPPORTED_VERSION', `@react-three/fiber ${fiber} is installed but Prismbox needs 9 or newer.`);
+    if (major(next) < 14) throw new DetectError('UNSUPPORTED_VERSION', `Next.js ${next} is installed but Prismbox needs Next.js 14 or newer.`);
+    const nextConfig = NEXT_CONFIGS.map((c) => path.join(root, c)).find((p) => existsSync(p)) ?? null;
+    return { framework: 'next', root, viteConfig: null, nextConfig, versions: { next, react, three, fiber } };
+  }
+
+  const vite = installedVersion(req, 'vite');
   if (!vite || !react || !fiber) throw new DetectError('NOT_INSTALLED', 'Dependencies are not installed. Run your package manager\'s install first.');
   if (major(react) < 19) throw new DetectError('UNSUPPORTED_VERSION', `React ${react} is installed but Prismbox needs React 19 or newer.`);
   if (major(fiber) < 9) throw new DetectError('UNSUPPORTED_VERSION', `@react-three/fiber ${fiber} is installed but Prismbox needs 9 or newer.`);
   if (major(vite) < 5) throw new DetectError('UNSUPPORTED_VERSION', `Vite ${vite} is installed but Prismbox needs Vite 5 or newer.`);
-  const viteConfig = CONFIGS.map((c) => path.join(root, c)).find((p) => existsSync(p)) ?? null;
-  return { root, viteConfig, versions: { vite, react, three, fiber } };
+  const viteConfig = VITE_CONFIGS.map((c) => path.join(root, c)).find((p) => existsSync(p)) ?? null;
+  return { framework: 'vite', root, viteConfig, nextConfig: null, versions: { vite, react, three, fiber } };
 }
 
 /** Load the USER's installed Vite (never a bundled one), so their config and plugins run against their own version. */

@@ -76,7 +76,8 @@ export async function launch(opts: LaunchOptions): Promise<Running> {
   const studioUrl = `${origin}/#token=${token}`;
   opts.log(`prismbox ${opts.version}`);
   opts.log(`  project   ${project.root}`);
-  opts.log(`  vite      ${project.versions.vite}   react ${project.versions.react}   r3f ${project.versions.fiber}   three ${project.versions.three ?? '?'}`);
+  const fw = project.framework === 'next' ? `next      ${project.versions.next}` : `vite      ${project.versions.vite}`;
+  opts.log(`  ${fw}   react ${project.versions.react}   r3f ${project.versions.fiber}   three ${project.versions.three ?? '?'}`);
   opts.log(`  your page ${pageUrl}`);
   opts.log(`  studio    ${studioUrl}`);
   for (const w of compatWarnings(project.versions)) opts.log(`warning: ${w}`);
