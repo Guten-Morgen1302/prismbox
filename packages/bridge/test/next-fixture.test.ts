@@ -9,9 +9,9 @@ import {
   transformNextClientComponent,
 } from '../src/next-plugin';
 
-const fixtureDir = fileURLToPath(new URL('../../../examples/next-hero/', import.meta.url));
+const fixtureDir = fileURLToPath(new URL('../../../e2e/fixtures/next-hero/', import.meta.url));
 
-describe('Next.js App Router e2e fixture (examples/next-hero)', () => {
+describe('Next.js App Router e2e fixture (e2e/fixtures/next-hero)', () => {
   it('detect() recognizes the fixture as a Next.js App Router project', () => {
     // Fake node_modules in fixture if not already present
     const nm = path.join(fixtureDir, 'node_modules');
