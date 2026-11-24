@@ -108,9 +108,9 @@ describe('project detection (read-only)', () => {
     fakeModules(react18, { vite: '8.0.0', react: '18.3.1', '@react-three/fiber': '9.0.0' });
     const okVite = tmp({ devDependencies: { vite: '8', react: '19', '@react-three/fiber': '9', three: '0.180' } });
     fakeModules(okVite, { vite: '8.1.0', react: '19.1.0', '@react-three/fiber': '9.2.0', three: '0.180.0' });
-    const okNext = tmp({ dependencies: { next: '15', react: '19', '@react-three/fiber': '9' } });
+    const okNext = tmp({ dependencies: { next: '15', react: '19', '@react-three/fiber': '9', three: '0.180' } });
     mkdirSync(path.join(okNext, 'app'));
-    fakeModules(okNext, { next: '15.1.0', react: '19.1.0', '@react-three/fiber': '9.2.0' });
+    fakeModules(okNext, { next: '15.1.0', react: '19.1.0', '@react-three/fiber': '9.2.0', three: '0.180.0' });
     try {
       expect(code(() => detect(empty))).toBe('NOT_A_PROJECT');
       expect(code(() => detect(notVite))).toBe('NOT_VITE');
@@ -120,7 +120,7 @@ describe('project detection (read-only)', () => {
       expect(detect(okVite).framework).toBe('vite');
       expect(detect(okVite).versions).toEqual({ vite: '8.1.0', react: '19.1.0', three: '0.180.0', fiber: '9.2.0' });
       expect(detect(okNext).framework).toBe('next');
-      expect(detect(okNext).versions).toEqual({ next: '15.1.0', react: '19.1.0', three: null, fiber: '9.2.0' });
+      expect(detect(okNext).versions).toEqual({ next: '15.1.0', react: '19.1.0', three: '0.180.0', fiber: '9.2.0' });
       const r = await exec(['--root', pagesRouter, '--no-open']);
       expect(r.code).toBe(1);
       expect(r.err).toContain('Pages Router is not supported');
