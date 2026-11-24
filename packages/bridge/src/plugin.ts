@@ -25,8 +25,8 @@ export interface PluginOptions {
   overlayPath?: string;
 }
 
-function findOverlay(explicit?: string): string {
-  const here = path.dirname(fileURLToPath(import.meta.url));
+export function findOverlay(explicit?: string): string {
+  const here = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
   for (const p of [explicit, path.join(here, 'overlay.js'), path.join(here, '..', 'dist', 'overlay.js')]) if (p && existsSync(p)) return p;
   throw new Error('prismbox: the overlay bundle (dist/overlay.js) is missing. Run `pnpm build`.');
 }
