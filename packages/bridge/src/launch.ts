@@ -1,11 +1,14 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import { createServer as createHttpServer } from 'node:http';
+import net from 'node:net';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDaemon } from './daemon/server';
 import type { Daemon } from './daemon/server';
-import { compatWarnings, detect, loadUserVite } from './detect';
+import { compatWarnings, detect, loadUserNext, loadUserNextConfig, loadUserVite } from './detect';
+import { createNextWebpackConfig } from './next-plugin';
 import { prismboxPlugin } from './plugin';
 import { prismHome, removeSession, writeSession } from './session-file';
 
@@ -25,6 +28,20 @@ export interface Running {
   close(): Promise<void>;
 }
 
+function getAvailablePort(preferred: number): Promise<number> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.unref();
+    server.on('error', () => {
+      resolve(getAvailablePort(preferred + 1));
+    });
+    server.listen(preferred, () => {
+      const { port } = server.address() as net.AddressInfo;
+      server.close(() => resolve(port));
+    });
+  });
+}
+
 function studioDir(): string | null {
   const here = path.dirname(fileURLToPath(import.meta.url));
   for (const p of [path.join(here, 'studio'), path.join(here, '..', 'dist', 'studio')]) if (existsSync(path.join(p, 'index.html'))) return p;
@@ -41,8 +58,8 @@ function openBrowser(url: string): void {
 }
 
 /**
- * `prismbox dev`: start the daemon, start the USER's own Vite dev server in this process with the Prismbox plugin
- * injected inline (their vite.config, package.json and imports are never touched), and serve Studio.
+ * `prismbox dev`: start the daemon, start the USER's own Vite or Next.js dev server in this process with the Prismbox
+ * dev instrumentation injected inline (their configs, package.json and imports are never touched), and serve Studio.
  */
 export async function launch(opts: LaunchOptions): Promise<Running> {
   const project = detect(opts.root);
@@ -54,6 +71,74 @@ export async function launch(opts: LaunchOptions): Promise<Running> {
   writeSession(home, { port, token, pid: process.pid, root: project.root, startedAt: new Date().toISOString(), version: opts.version });
   const dropSession = () => removeSession(home, project.root, process.pid);
   process.once('exit', dropSession);
+
+  if (project.framework === 'next') {
+    let nextApp: any;
+    let httpServer: any;
+    let actualPort = 3000;
+    try {
+      const nextFn = await loadUserNext(project.root);
+      const userConfig = await loadUserNextConfig(project.root);
+      actualPort = await getAvailablePort(3000);
+      const wrappedConfig = {
+        ...userConfig,
+        webpack: createNextWebpackConfig(userConfig?.webpack, {
+          root: project.root,
+          daemonOrigin: origin,
+        }),
+      };
+      nextApp = nextFn({
+        dev: true,
+        dir: project.root,
+        hostname: 'localhost',
+        port: actualPort,
+        conf: wrappedConfig,
+      });
+      await nextApp.prepare();
+      const handle = nextApp.getRequestHandler();
+      httpServer = createHttpServer((req, res) => {
+        handle(req, res);
+      });
+      await new Promise<void>((resolve, reject) => {
+        httpServer.listen(actualPort, 'localhost', () => resolve());
+        httpServer.on('error', reject);
+      });
+    } catch (e) {
+      dropSession();
+      await daemon.close();
+      throw e;
+    }
+
+    for (const host of ['localhost', '127.0.0.1', '[::1]']) daemon.allowPageOrigin(`http://${host}:${actualPort}`);
+    const pageUrl = `http://localhost:${actualPort}/`;
+    daemon.setPageUrl(pageUrl);
+    const studioUrl = `${origin}/#token=${token}`;
+    opts.log(`prismbox ${opts.version}`);
+    opts.log(`  project   ${project.root}`);
+    opts.log(`  next      ${project.versions.next}   react ${project.versions.react}   r3f ${project.versions.fiber}   three ${project.versions.three ?? '?'}`);
+    opts.log(`  your page ${pageUrl}`);
+    opts.log(`  studio    ${studioUrl}`);
+    for (const w of compatWarnings(project.versions)) opts.log(`warning: ${w}`);
+    opts.log('Studio opens disarmed. Arm it to edit from the page. Nothing in your project was changed to run this.');
+    if (opts.open) {
+      openBrowser(studioUrl);
+      openBrowser(pageUrl);
+    }
+    void port;
+    return {
+      daemon,
+      studioUrl,
+      pageUrl,
+      async close() {
+        dropSession();
+        await Promise.allSettled([
+          new Promise((resolve) => (httpServer ? httpServer.close(resolve) : resolve(undefined))),
+          nextApp?.close?.(),
+          daemon.close(),
+        ]);
+      },
+    };
+  }
 
   const vite = await loadUserVite(project.root);
   let server: Awaited<ReturnType<typeof vite.createServer>>;
@@ -76,8 +161,7 @@ export async function launch(opts: LaunchOptions): Promise<Running> {
   const studioUrl = `${origin}/#token=${token}`;
   opts.log(`prismbox ${opts.version}`);
   opts.log(`  project   ${project.root}`);
-  const fw = project.framework === 'next' ? `next      ${project.versions.next}` : `vite      ${project.versions.vite}`;
-  opts.log(`  ${fw}   react ${project.versions.react}   r3f ${project.versions.fiber}   three ${project.versions.three ?? '?'}`);
+  opts.log(`  vite      ${project.versions.vite}   react ${project.versions.react}   r3f ${project.versions.fiber}   three ${project.versions.three ?? '?'}`);
   opts.log(`  your page ${pageUrl}`);
   opts.log(`  studio    ${studioUrl}`);
   for (const w of compatWarnings(project.versions)) opts.log(`warning: ${w}`);

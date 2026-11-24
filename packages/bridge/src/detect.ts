@@ -125,3 +125,37 @@ export async function loadUserVite(root: string): Promise<typeof ViteModule> {
   const rel = pick(pkg.exports?.['.']) ?? pkg.module ?? pkg.main ?? 'index.js';
   return (await import(pathToFileURL(path.join(dir, rel)).href)) as typeof ViteModule;
 }
+
+/** Load the USER's installed Next.js (never a bundled one). */
+export async function loadUserNext(root: string): Promise<any> {
+  const req = createRequire(path.join(root, 'package.json'));
+  const pkgJson = req.resolve('next/package.json');
+  const pkg = JSON.parse(readFileSync(pkgJson, 'utf8')) as { exports?: Record<string, unknown>; module?: string; main?: string };
+  const dir = path.dirname(pkgJson);
+  const pick = (v: unknown): string | null => {
+    if (typeof v === 'string') return v;
+    if (v && typeof v === 'object') {
+      const o = v as Record<string, unknown>;
+      return pick(o.import) ?? pick(o.default) ?? null;
+    }
+    return null;
+  };
+  const rel = pick(pkg.exports?.['.']) ?? pkg.main ?? 'index.js';
+  const mod = await import(pathToFileURL(path.join(dir, rel)).href);
+  return mod.default ?? mod;
+}
+
+/** Load the USER's Next.js config without touching disk. */
+export async function loadUserNextConfig(root: string): Promise<any> {
+  const req = createRequire(path.join(root, 'package.json'));
+  try {
+    const configModule = req.resolve('next/dist/server/config');
+    const mod = await import(pathToFileURL(configModule).href);
+    const loadConfig = mod.default ?? mod;
+    const PHASE_DEVELOPMENT_SERVER = 'phase-development-server';
+    const conf = await loadConfig(PHASE_DEVELOPMENT_SERVER, root);
+    return conf ?? {};
+  } catch {
+    return {};
+  }
+}
