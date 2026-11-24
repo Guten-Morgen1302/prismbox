@@ -28,24 +28,26 @@ Prismbox is in early development. This page describes the intended design and ma
                    └────────────────────────────┘
 ```
 
-1. **Your real page** runs on your own dev server. A dev-only plugin (Vite first) tags R3F elements with their source location and injects a small overlay into the page's own `<Canvas>`. The overlay does picking, the gizmo, camera swap and canvas capture through the public `useThree()` API.
+1. **Your real page** runs on your own dev server. Dev-only instrumentation (Vite plugin or Next.js App Router webpack loader) tags R3F elements with their source location and injects a small overlay into the page's own `<Canvas>`. The overlay does picking, the gizmo, camera swap and canvas capture through the public `useThree()` API.
 2. **The daemon** owns the scene snapshot, the ops queue and the write path. Claude talks to it over MCP.
 3. **Studio** is the control panel: scene tree, inspector, a diff strip showing every edit as a real diff, and an agent-context indicator.
 
-**Fallback.** Where the plugin cannot inject (Next.js until a zero-repo-change launch exists, scene-only modules), an isolated harness renders the component in a separate-origin iframe.
+**Next.js App Router.** For Next.js projects, Prismbox supports the App Router (`app/` or `src/app/`). Server Components are left completely untouched; Client Components (`'use client'`) containing R3F Canvas are instrumented in-memory without modifying `next.config` or `package.json`. Pages Router is not supported.
+
+**Fallback.** Where real-page mode cannot run (e.g. standalone scene modules), an isolated harness renders the component in a separate-origin iframe.
 
 **Playground.** The same Studio on an in-memory file system, for editing templates in the browser with zero install. It edits templates, not your repo.
 
 ## Local mode (M2)
 
-`prismbox` (alias `prismbox dev`) in a Vite + React 19 + R3F 9 project:
+`prismbox` (alias `prismbox dev`) in a Vite or Next.js App Router + React 19 + R3F 9 project:
 
-1. detects the project read-only (versions, no changes to your files),
+1. detects the project read-only (versions, router, no changes to your files),
 2. starts the **daemon** on `127.0.0.1` (default 4173) with a random per-run Studio token,
-3. loads **your** installed Vite and calls `createServer` with the Prismbox plugin as an *inline* plugin, so your `vite.config` still applies and is never edited,
+3. loads **your** installed Vite or Next.js dev server with Prismbox dev instrumentation attached in-process, so your config still applies and is never edited on disk,
 4. serves Studio from the daemon.
 
-The plugin is `apply: 'serve'` and `enforce: 'pre'`, adds `resolve.dedupe` for react, react-dom, three and R3F, and re-checks `command === 'serve'` in every hook. It runs `instrument()` on your `.tsx` and serves the overlay as the virtual module `virtual:prism-overlay`. Since it is only ever passed in by `prismbox`, your own `vite build` never loads it, and a test builds the example with the plugin loaded anyway and asserts zero Prismbox bytes.
+In Vite, the plugin is `apply: 'serve'` and `enforce: 'pre'`. In Next.js App Router, a custom webpack loader runs `enforce: 'pre'` only on Client Components, while `virtual:prism-overlay` resolves to a no-op component during SSR (`isServer: true`) and the real overlay on the client (`isServer: false`). Your production builds never load it, resulting in zero production Prismbox bytes.
 
 **Daemon.** HTTP + WebSocket on loopback only. Every request checks the `Host` header (DNS rebinding); the Studio socket requires the Studio origin and the session token (moved from the URL fragment into sessionStorage and stripped from the URL); the page socket requires the dev server's origin and a one-shot token fetched per page load. All messages are validated with zod. Files are confined to the project root: no `..`, no absolute paths, no dotfiles or `node_modules`, only `.tsx .ts .jsx .js`, realpath re-checked so a symlink cannot escape.
 

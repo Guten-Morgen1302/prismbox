@@ -18,7 +18,7 @@
 
 <!-- DEMO_VIDEO_URL -->
 
-Prismbox is a visual editor for [React Three Fiber](https://r3f.docs.pmnd.rs) that treats your source file as the single source of truth. You run it next to your own Vite dev server, drag an object on your actual landing page, and the edit lands in the `.tsx` as a text diff, not a regenerated file. An MCP server lets Claude Code, Cursor, Windsurf or Codex see what you have selected and edit it the same way.
+Prismbox is a visual editor for [React Three Fiber](https://r3f.docs.pmnd.rs) that treats your source file as the single source of truth. You run it next to your own Vite or Next.js App Router dev server, drag an object on your actual landing page, and the edit lands in the `.tsx` as a text diff, not a regenerated file. An MCP server lets Claude Code, Cursor, Windsurf or Codex see what you have selected and edit it the same way.
 
 You commit plain React Three Fiber. Prismbox is not a dependency of your project.
 
@@ -28,11 +28,11 @@ You commit plain React Three Fiber. Prismbox is not a dependency of your project
 
 **2. Agent point-and-edit over MCP.** Click a mesh and tell your agent to make *this* glassier. Claude Code, Cursor or Windsurf calls `prism_get_selection` to learn what "this" is (file, line, props, uniforms, surrounding source), `prism_get_view` to see the live canvas **without gizmos**, and `prism_set_prop` / `prism_set_uniform` to patch it. Agent edits go through the same parser and writer as yours, show up in Studio tagged `agent`, and undo with one click.
 
-**3. Zero production lock-in.** Prismbox never touches your `package.json`, `vite.config` or imports. The plugin exists only in the dev server it starts, and `vite build` on your project emits **0 bytes of Prismbox code**. A test builds the example with the plugin loaded and asserts it, and a tarball test checks it again from the packed package.
+**3. Zero production lock-in.** Prismbox never touches your `package.json`, `vite.config`, `next.config` or imports. The dev instrumentation exists only in the dev server it starts, and `vite build` or `next build` on your project emits **0 bytes of Prismbox code**. A test builds the example with the plugin loaded and asserts it, and a tarball test checks it again from the packed package.
 
 ## Quickstart
 
-In a Vite + React 19 + React Three Fiber 9 project:
+In a Vite or Next.js App Router + React 19 + React Three Fiber 9 project:
 
 ```bash
 npx prismbox
@@ -128,16 +128,16 @@ There are several good ways to work on 3D for the web. This reflects our underst
 | Runtime lock-in | None; `vite build` contains no Prismbox code | None; it edits your components | The scene stays in Spline; exported code is a snapshot |
 | Agent bridge | MCP server: selection, live screenshot, validated edits | No MCP server that we are aware of | An MCP integration inside the desktop app |
 | What it is best at | Nudging a scene an agent wrote, on the real page, with reviewable diffs | A full editor for your R3F component tree | Designing 3D from scratch: modeling, materials, interaction |
-| Frameworks | Vite today; Next.js on the roadmap | React / R3F | Any, via export |
+| Frameworks | Vite and Next.js App Router (Pages Router unsupported) | React / R3F | Any, via export |
 | Price / license | Free, MIT, local only | Open source | Commercial, with a free tier |
 
 Pick Spline to design a scene visually and export it. Pick Triplex for a dedicated editor over your component tree. Pick Prismbox when an agent writes the scene and you want to steer it on the real page and keep the diff small.
 
 ## Architecture and scope
 
-`npx prismbox` starts a loopback **daemon**, runs **your own Vite dev server** in the same process with a dev-only plugin attached inline (your config is never edited), and serves **Studio**. The plugin tags R3F elements with their source position and injects a small overlay into your `<Canvas>`. Edits flow overlay → daemon → `@prismbox/core` parser and `magic-string` writer → your file → Vite HMR → your page.
+`npx prismbox` starts a loopback **daemon**, runs **your own Vite or Next.js dev server** in the same process with dev-only instrumentation attached inline (your config is never edited), and serves **Studio**. The instrumentation tags R3F elements with their source position and injects a small overlay into your `<Canvas>`. Edits flow overlay → daemon → `@prismbox/core` parser and `magic-string` writer → your file → HMR → your page.
 
-- **Vite first.** The real-page path is Vite + React 19 + R3F 9. **Next.js is on the roadmap**; it needs a launch path that does not ask you to change your config.
+- **Vite & Next.js App Router.** The real-page path supports Vite and Next.js App Router projects (Next 14+, React 19, R3F 9). In Next.js, Server Components are left completely untouched; Client Components (`'use client'`) with R3F Canvas are instrumented in-memory through the dev server without touching your `next.config` or `package.json`. Next.js Pages Router is not supported.
 - **A declared subset.** Round-tripping is only trustworthy on literal props, so that is what is editable. An expression such as `position={[x, y * 2, 0]}` is shown read-only and never rewritten, as is anything inside `.map()` or a conditional ([docs/subset.md](docs/subset.md)). Same-file `const` and empty-deps `useMemo` bindings are resolved for shader props, and literal keys of a mixed `uniforms` object stay editable. In a first measurement of ten agent-written hero scenes, about 97% of nodes were editable with the style guide and about 72% without it. That is a regression signal, not a benchmark.
 - **`// @prism` comments** (`// @prism uniform uGlow float 0..2 =1`) are ordinary GLSL comments. They describe a slider range to the editor, import nothing, and ship in your shader string like any other comment.
 - **Animation.** Only R3F-clock-driven animation pauses while you edit; `performance.now()` and `Date.now()` do not. The 3D scene's own pointer handlers are paused while armed; ordinary page controls keep working.
