@@ -1,0 +1,25 @@
+{
+  "name": "next-hero",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A plain Next.js App Router + React 19 + React Three Fiber landing page with a 3D hero. It has no Prismbox dependency or config; it is the target of the Next.js e2e fixture.",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@react-three/fiber": "^9.0.0",
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.180.0",
+    "typescript": "^5.0.0"
+  }
+}
