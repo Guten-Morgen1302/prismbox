@@ -5,6 +5,7 @@ import {
   createNextWebpackConfig,
   isClientComponent,
   transformNextClientComponent,
+  type WebpackConfig,
 } from '../src/next-plugin';
 import prismboxNextLoader from '../src/next-loader';
 
@@ -88,7 +89,7 @@ export function Counter() {
 describe('Next.js webpack configuration wrapper', () => {
   it('wraps webpack to add pre-loader and virtual:prism-overlay aliases for client & server', () => {
     let originalCalled = false;
-    const existingWebpack = (cfg: any) => {
+    const existingWebpack = (cfg: WebpackConfig) => {
       originalCalled = true;
       cfg.customProp = true;
       return cfg;
@@ -101,25 +102,25 @@ describe('Next.js webpack configuration wrapper', () => {
     });
 
     // Test client compilation
-    const clientConfig: any = {};
+    const clientConfig: WebpackConfig = {};
     const clientResult = webpack(clientConfig, { isServer: false, dev: true });
     expect(originalCalled).toBe(true);
     expect(clientResult.customProp).toBe(true);
-    expect(clientResult.resolve.alias['virtual:prism-overlay']).toContain('virtual-prism-overlay-client.js');
-    const clientOverlayCode = readFileSync(clientResult.resolve.alias['virtual:prism-overlay'], 'utf8');
+    expect(clientResult.resolve?.alias?.['virtual:prism-overlay']).toContain('virtual-prism-overlay-client.js');
+    const clientOverlayCode = readFileSync(clientResult.resolve?.alias?.['virtual:prism-overlay'] ?? '', 'utf8');
     expect(clientOverlayCode).toContain('globalThis.__PRISMBOX_DAEMON__ = "http://127.0.0.1:4173";');
 
     // Loader rule should be registered
-    const loaderRule = clientResult.module.rules.find((r: any) => r.enforce === 'pre');
+    const loaderRule = clientResult.module?.rules?.find((r) => r.enforce === 'pre');
     expect(loaderRule).toBeDefined();
-    expect(loaderRule.test).toEqual(/\.(tsx|jsx)$/);
-    expect(loaderRule.exclude).toEqual(/node_modules/);
+    expect(loaderRule?.test).toEqual(/\.(tsx|jsx)$/);
+    expect(loaderRule?.exclude).toEqual(/node_modules/);
 
     // Test server compilation
-    const serverConfig: any = {};
+    const serverConfig: WebpackConfig = {};
     const serverResult = webpack(serverConfig, { isServer: true, dev: true });
-    expect(serverResult.resolve.alias['virtual:prism-overlay']).toContain('virtual-prism-overlay-server.js');
-    const serverOverlayCode = readFileSync(serverResult.resolve.alias['virtual:prism-overlay'], 'utf8');
+    expect(serverResult.resolve?.alias?.['virtual:prism-overlay']).toContain('virtual-prism-overlay-server.js');
+    const serverOverlayCode = readFileSync(serverResult.resolve?.alias?.['virtual:prism-overlay'] ?? '', 'utf8');
     expect(serverOverlayCode).toContain('export function __PrismOverlay() { return null; }');
   });
 });
@@ -131,20 +132,20 @@ describe('Next loader behavior', () => {
     const ctx = {
       resourcePath: '/mock/project/app/Scene.tsx',
       getOptions: () => ({ root: '/mock/project' }),
-      callback: (_err: any, code: string) => {
+      callback: (_err: null, code?: string) => {
         cbCalled = true;
-        outCode = code;
+        outCode = code ?? '';
       },
     };
 
     const serverSource = 'export default function ServerPage() { return <div>Server</div>; }';
-    prismboxNextLoader.call(ctx, serverSource, null);
+    prismboxNextLoader.call(ctx, serverSource);
     expect(cbCalled).toBe(true);
     expect(outCode).toBe(serverSource);
 
     cbCalled = false;
     const clientSource = `'use client';\nimport { Canvas } from '@react-three/fiber';\nexport function C() { return <Canvas><mesh /></Canvas>; }`;
-    prismboxNextLoader.call(ctx, clientSource, null);
+    prismboxNextLoader.call(ctx, clientSource);
     expect(cbCalled).toBe(true);
     expect(outCode).toContain('userData-prism');
   });

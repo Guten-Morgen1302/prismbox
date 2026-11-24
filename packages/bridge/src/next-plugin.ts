@@ -42,6 +42,31 @@ export function setupVirtualOverlayFiles(options: { daemonOrigin: string; overla
   return { tmpDir, clientOverlayPath, serverOverlayPath };
 }
 
+export interface WebpackConfig {
+  resolve?: {
+    alias?: Record<string, string>;
+    modules?: string[];
+  };
+  module?: {
+    rules?: Array<{
+      test?: RegExp;
+      exclude?: RegExp;
+      enforce?: string;
+      use?: Array<{
+        loader?: string;
+        options?: Record<string, unknown>;
+      }>;
+    }>;
+  };
+  [key: string]: unknown;
+}
+
+export interface WebpackOptions {
+  isServer?: boolean;
+  dev?: boolean;
+  [key: string]: unknown;
+}
+
 /**
  * Creates a wrapped webpack config function that injects Prismbox instrumentation into Next.js.
  * - Leaves Server Components untouched.
@@ -49,13 +74,13 @@ export function setupVirtualOverlayFiles(options: { daemonOrigin: string; overla
  * - Virtual overlay alias resolves to client runtime on client and a harmless no-op on server (SSR).
  */
 export function createNextWebpackConfig(
-  existingWebpack: ((config: any, options: any) => any) | undefined,
+  existingWebpack: ((config: WebpackConfig, options: WebpackOptions) => WebpackConfig) | undefined,
   options: NextPluginOptions,
 ) {
   const { clientOverlayPath, serverOverlayPath } = setupVirtualOverlayFiles(options);
   const loaderPath = findNextLoader();
 
-  return function webpack(config: any, webpackOpts: any) {
+  return function webpack(config: WebpackConfig, webpackOpts: WebpackOptions): WebpackConfig {
     if (typeof existingWebpack === 'function') {
       config = existingWebpack(config, webpackOpts) ?? config;
     }

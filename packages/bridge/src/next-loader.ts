@@ -1,8 +1,15 @@
 import { transformNextClientComponent } from './next-transform';
 
-export default function prismboxNextLoader(this: any, source: string, map: any) {
+interface LoaderContext {
+  getOptions?: () => Record<string, unknown>;
+  query?: Record<string, unknown>;
+  resourcePath?: string;
+  callback?: (err: null, content?: string, map?: unknown) => void;
+}
+
+export default function prismboxNextLoader(this: LoaderContext | void, source: string, map?: unknown) {
   const options = (typeof this?.getOptions === 'function' ? this.getOptions() : this?.query) || {};
-  const root = options.root || process.cwd();
+  const root = (typeof options.root === 'string' ? options.root : null) || process.cwd();
   const transformed = transformNextClientComponent(source, this?.resourcePath || '', root);
   if (transformed) {
     if (typeof this?.callback === 'function') {

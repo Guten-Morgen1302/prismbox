@@ -73,16 +73,16 @@ export async function launch(opts: LaunchOptions): Promise<Running> {
   process.once('exit', dropSession);
 
   if (project.framework === 'next') {
-    let nextApp: any;
-    let httpServer: any;
+    let nextApp: { prepare(): Promise<void>; getRequestHandler(): (req: unknown, res: unknown) => Promise<void>; close?(): Promise<void> } | undefined;
+    let httpServer: { close(cb?: (err?: unknown) => void): void } | undefined;
     let actualPort = 3000;
     try {
-      const nextFn = await loadUserNext(project.root);
+      const nextFn = (await loadUserNext(project.root)) as (opts: unknown) => NonNullable<typeof nextApp>;
       const userConfig = await loadUserNextConfig(project.root);
       actualPort = await getAvailablePort(3000);
       const wrappedConfig = {
         ...userConfig,
-        webpack: createNextWebpackConfig(userConfig?.webpack, {
+        webpack: createNextWebpackConfig(userConfig.webpack as never, {
           root: project.root,
           daemonOrigin: origin,
         }),
@@ -96,12 +96,13 @@ export async function launch(opts: LaunchOptions): Promise<Running> {
       });
       await nextApp.prepare();
       const handle = nextApp.getRequestHandler();
-      httpServer = createHttpServer((req, res) => {
-        handle(req, res);
+      const server = createHttpServer((req, res) => {
+        void handle(req, res);
       });
+      httpServer = server;
       await new Promise<void>((resolve, reject) => {
-        httpServer.listen(actualPort, 'localhost', () => resolve());
-        httpServer.on('error', reject);
+        server.listen(actualPort, 'localhost', () => resolve());
+        server.on('error', reject);
       });
     } catch (e) {
       dropSession();

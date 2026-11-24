@@ -87,9 +87,9 @@ describe('Next.js App Router e2e fixture (examples/next-hero)', () => {
     });
 
     const clientConf = webpackFn({}, { isServer: false, dev: true });
-    expect(clientConf.resolve.alias['virtual:prism-overlay']).toContain('virtual-prism-overlay-client.js');
+    expect(clientConf.resolve?.alias?.['virtual:prism-overlay']).toContain('virtual-prism-overlay-client.js');
 
     const serverConf = webpackFn({}, { isServer: true, dev: true });
-    expect(serverConf.resolve.alias['virtual:prism-overlay']).toContain('virtual-prism-overlay-server.js');
+    expect(serverConf.resolve?.alias?.['virtual:prism-overlay']).toContain('virtual-prism-overlay-server.js');
   });
 });
