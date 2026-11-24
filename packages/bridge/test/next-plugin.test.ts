@@ -1,6 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { detect } from '../src/detect';
 import {
   createNextWebpackConfig,
   isClientComponent,
@@ -148,5 +150,75 @@ describe('Next loader behavior', () => {
     prismboxNextLoader.call(ctx, clientSource);
     expect(cbCalled).toBe(true);
     expect(outCode).toContain('userData-prism');
+  });
+});
+
+const fixtureDir = fileURLToPath(new URL('../../../e2e/fixtures/next-hero/', import.meta.url));
+
+describe('Next.js App Router e2e fixture (e2e/fixtures/next-hero)', () => {
+  it('detect() recognizes the fixture as a Next.js App Router project', () => {
+    const nm = path.join(fixtureDir, 'node_modules');
+    const fake = (name: string, version: string) => {
+      const p = path.join(nm, ...name.split('/'));
+      mkdirSync(p, { recursive: true });
+      writeFileSync(path.join(p, 'package.json'), JSON.stringify({ name, version }));
+    };
+    fake('next', '15.1.0');
+    fake('react', '19.0.0');
+    fake('@react-three/fiber', '9.0.0');
+    fake('three', '0.180.0');
+
+    try {
+      const proj = detect(fixtureDir);
+      expect(proj.framework).toBe('next');
+      expect(proj.root).toBe(path.resolve(fixtureDir));
+      expect(proj.nextConfig).toBe(path.join(path.resolve(fixtureDir), 'next.config.mjs'));
+      expect(proj.viteConfig).toBeNull();
+      expect(proj.versions.next).toBe('15.1.0');
+      expect(proj.versions.react).toBe('19.0.0');
+      expect(proj.versions.fiber).toBe('9.0.0');
+    } finally {
+      rmSync(nm, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves layout.tsx and page.tsx Server Components completely untouched', () => {
+    const layoutCode = readFileSync(path.join(fixtureDir, 'app', 'layout.tsx'), 'utf8');
+    const pageCode = readFileSync(path.join(fixtureDir, 'app', 'page.tsx'), 'utf8');
+
+    expect(isClientComponent(layoutCode)).toBe(false);
+    expect(isClientComponent(pageCode)).toBe(false);
+
+    const layoutTransformed = transformNextClientComponent(
+      layoutCode,
+      path.join(fixtureDir, 'app', 'layout.tsx'),
+      fixtureDir,
+    );
+    const pageTransformed = transformNextClientComponent(
+      pageCode,
+      path.join(fixtureDir, 'app', 'page.tsx'),
+      fixtureDir,
+    );
+
+    expect(layoutTransformed).toBeNull();
+    expect(pageTransformed).toBeNull();
+  });
+
+  it('instruments HeroScene.tsx Client Component with Canvas overlay and userData-prism tags', () => {
+    const heroCode = readFileSync(path.join(fixtureDir, 'app', 'HeroScene.tsx'), 'utf8');
+
+    expect(isClientComponent(heroCode)).toBe(true);
+
+    const transformed = transformNextClientComponent(
+      heroCode,
+      path.join(fixtureDir, 'app', 'HeroScene.tsx'),
+      fixtureDir,
+    );
+
+    expect(transformed).not.toBeNull();
+    expect(transformed!.code).toContain('import { __PrismOverlay } from "virtual:prism-overlay";');
+    expect(transformed!.code).toContain('<__PrismOverlay />');
+    expect(transformed!.code).toContain('userData-prism="app/HeroScene.tsx:');
+    expect(transformed!.map).toBeDefined();
   });
 });

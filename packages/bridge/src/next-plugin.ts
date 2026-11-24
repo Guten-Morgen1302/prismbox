@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findOverlay } from './plugin';
-export { isClientComponent, transformNextClientComponent } from './next-transform';
+export { isClientComponent, transformNextClientComponent } from './next-loader';
 
 export interface NextPluginOptions {
   root: string;
